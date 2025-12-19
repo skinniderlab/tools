@@ -1,0 +1,122 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skinniderlab-tools"
+authors = [
+    {name="Michael Skinnider", email="skinnider@princeton.edu"},
+{name="Hsin-Hsiang Chung", email="hc3393@princeton.edu"},
+{name="Vishu Gupta", email="vishu.gupta@princeton.edu"},
+{name="Anushka Acharya", email="aa9078@princeton.edu"}
+]
+description = """A collection of commonly used tools for mass spectrometry analysis."""
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+]
+
+dependencies = [
+    "matplotlib",
+    "matchms",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "scipy",
+    "setuptools",
+    "pydantic",
+    "pyimzML"
+]
+
+dynamic = ["version"]
+
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-sv"
+minversion = 8.3
+
+
+[project.optional-dependencies]
+dev = ["pytest", "mypy"]
+
+[tool.mypy]
+allow_redefinition = true
+ignore_missing_imports = true
+exclude = ["test"]
+
+[tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+line-length = 100
+indent-width = 4
+
+[tool.ruff.format]
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint]
+extend-select = [
+    "B",           # flake8-bugbear
+    "I",           # isort
+    "ARG",         # flake8-unused-arguments
+    "C4",          # flake8-comprehensions
+    "EM",          # flake8-errmsg
+    "ICN",         # flake8-import-conventions
+    "PGH",         # pygrep-hooks
+    "PIE",         # flake8-pie
+    "PL",          # pylint
+    "PT",          # flake8-pytest-style
+    "PTH",         # flake8-use-pathlib
+    "RET",         # flake8-return
+    "RUF",         # Ruff-specific
+    "SIM",         # flake8-simplify
+    "TID251",      # flake8-tidy-imports.banned-api
+    "T20",         # flake8-print
+    "UP",          # pyupgrade
+    "YTT",         # flake8-2020
+]
+
+ignore = [
+    "EM101",    # Exceptions using string literals
+    "EM102",    # Exceptions using f-strings
+    "PLR0913",  # too many arguments to a function
+]
+
+[tool.ruff.lint.per-file-ignores]
+"test_elements.py" = ["PLR2004"]
