@@ -1,2 +1,17 @@
+# OS X
 .idea
 .DS_Store
+
+# Eclipse
+.settings
+.project
+.classpath
+/build/
+/bin/
+/target/
+
+# Rstudio
+.R*
+
+# Python
+*.pyc
