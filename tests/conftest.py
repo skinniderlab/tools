@@ -3,8 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tools.database import Database
-from tools.elements import IsotopeDB
+from tools import Database, IsotopeDB, Peaks
 
 np.set_printoptions(legacy="1.25")
 
@@ -19,6 +18,18 @@ def data_dir():
 def isotope_db(data_dir):
     """IsotopeDB instance initialized with test data for validating class methods."""
     return IsotopeDB(filepath=data_dir / "iso_list.csv")
+
+
+@pytest.fixture
+def peaks(data_dir, isotope_db):
+    """Peaks instance initialized with test data for validating class methods."""
+    return Peaks(filepath=data_dir / "peaks.csv", isotope_db=isotope_db)
+
+
+@pytest.fixture
+def peaks_2(data_dir, isotope_db):
+    """Peaks instance initialized with different test data for validating class methods."""
+    return Peaks(filepath=data_dir / "peaks_2.csv", isotope_db=isotope_db)
 
 
 @pytest.fixture

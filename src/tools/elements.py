@@ -63,14 +63,10 @@ class IsotopeDB:
         :raises ValueError: If the specified element is not present in the provided isotope file.
         """
         for element in self.elements:
-            if (isinstance(item, str) and item == element.symbol) or (
-                isinstance(item, Isotope) and item in element.isotopes
-            ):
-                return element
-            if isinstance(item, Element) and item == element:
+            if element == item or item in element:
                 return element
 
-        raise ValueError(f"Element {item} not present in the provided isotope file.")
+        raise KeyError(f"Element {item} not present in the provided isotope file.")
 
     def __contains__(self, item):
         return item in self.elements
@@ -78,6 +74,8 @@ class IsotopeDB:
 
 class Compound:
     """A chemical compound composed of multiple elements."""
+
+    VALID_ELEMENTS = ("C", "H", "O", "N", "P", "S", "F", "Cl", "Br", "I")
 
     def __init__(self, formula: dict, isotope_db: IsotopeDB):
         """
@@ -104,10 +102,10 @@ class Compound:
 
     @classmethod
     def from_str(cls, formula: str, isotope_db: IsotopeDB):
-        fmla_dict = str_to_dict(formula)
-        obj = cls.__new__(cls)  # uninitialized instance
-        cls.__init__(obj, formula=fmla_dict, isotope_db=isotope_db)
-        return obj
+        return cls(str_to_dict(formula), isotope_db)
+
+    def __hash__(self):
+        return hash((self.formula, self.monomass, tuple(self.monoisos)))
 
     def __repr__(self):
         return self.formula
@@ -146,10 +144,10 @@ class Compound:
         -------
         None
         """
-        elements = ("C", "H", "O", "N", "P", "S", "F", "Cl", "Br", "I")
-        order = dict.fromkeys(elements, 0)
 
-        # Keys in self.dict are sorted in the order described by elements tuple
+        order = dict.fromkeys(self.VALID_ELEMENTS, 0)
+
+        # Keys in self.dict are sorted in the order described by VALID_ELEMENTS tuple
         self.element_count = {self.isotope_db[k]: v for k, v in (order | formula).items() if v != 0}
         self.formula = "".join(f"{k}{'' if v == 1 else v}" for k, v in self.element_count.items())
 
@@ -284,7 +282,7 @@ class Compound:
 
         peaks = peaks[peaks.abundance != 0]
         peaks["charge"] = charge
-        if not charge == 0:
+        if charge != 0:
             peaks["mass"] = (peaks["mass"] - (5.486 * (10 ** (-4)) * charge)) / abs(charge)
 
         if scale == "rel":
@@ -348,6 +346,16 @@ class Element:
             return self.symbol == other
         return self.symbol == other.symbol and self.isotopes == other.isotopes
 
+    def __contains__(self, item):
+        return any(item == isotope for isotope in self.isotopes)
+
+    def __getitem__(self, item):
+        if item == self.symbol:
+            return self.monoisotope
+        if isotope := self._isotope_lookup[item]:
+            return isotope
+        raise KeyError(f"Isotope {item} not present in the provided isotope file.")
+
     @property
     def n_isotopes(self):
         """Returns the number of isotopes of an element."""
@@ -362,3 +370,8 @@ class Element:
     def other_isotopes(self):
         """Returns all but the most abundant isotope of an element."""
         return sorted(self.isotopes)[:-1]
+
+    @cached_property
+    def _isotope_lookup(self):
+        # O(1) lookup by symbol
+        return {iso.symbol: iso for iso in self.isotopes}

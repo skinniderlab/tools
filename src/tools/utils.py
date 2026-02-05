@@ -241,10 +241,34 @@ def str_to_dict(formula: str) -> dict:
     Given a chemical formula in string format, this methodr returns
     a dictionary mapping elements to respective amounts.
     """
-    stripped = re.sub(r"[+-](\d+)?$", "", formula)
-    split = re.split(r"([A-Z][a-z]?)", stripped)
 
-    return {
-        split[i]: int(amt if (amt := split[i + 1]) != "" else 1)
-        for i in range(1, len(split) - 1, 2)
-    }
+    pattern = r"(\[\d+\])?([A-Z][a-z]?)(\d*)"
+
+    result = {}
+    position = 0
+    for match in re.finditer(pattern, formula):
+        # check for invalid characters
+        if match.start() != position:
+            raise ValueError(
+                f"Invalid characters in formula: '{formula[position : match.start()]}' "
+                f"at position {position}"
+            )
+        isotope, element, count = match.groups()
+
+        if not element:
+            continue
+
+        key = f"{isotope.strip('[/]')}{element}" if isotope else element
+        count = int(count) if count else 1
+
+        result[key] = result.get(key, 0) + count
+        position = match.end()
+
+    # check for trailing invalid characters
+    if position != len(formula):
+        raise ValueError(f"Invalid trailing characters: '{formula[position:]}'")
+
+    if not result:
+        raise ValueError(f"No valid elements found in formula: '{formula}'")
+
+    return result

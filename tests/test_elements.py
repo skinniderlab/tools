@@ -1,4 +1,4 @@
-from tools.elements import Compound, Element, Isotope
+from tools import Compound, Element, Isotope
 
 
 def test_elements_object(isotope_db):
