@@ -244,6 +244,7 @@ def test_compound_modification(isotope_db):
 
 def test_compound_from_str(isotope_db):
     formulas_to_convert = {
+        "C4H9NO2+": "C4H9O2N",
         "C11H19NO9": "C11H19O9N",
         "C22H36O2": "C22H36O2",
         "C20H38O2": "C20H38O2",

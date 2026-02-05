@@ -241,7 +241,7 @@ def str_to_dict(formula: str) -> dict:
     Given a chemical formula in string format, this methodr returns
     a dictionary mapping elements to respective amounts.
     """
-
+    formula = re.sub(r"[+-](\d+)?$", "", formula)
     pattern = r"(\[\d+\])?([A-Z][a-z]?)(\d*)"
 
     result = {}
