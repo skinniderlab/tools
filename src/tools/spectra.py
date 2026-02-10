@@ -10,26 +10,48 @@ import numpy as np
 
 
 class Spectra:
+    VALID_RT_UNITS = {"seconds", "minute", "hour"}
+
+    CONVERSIONS = {
+        ("seconds", "minute"): lambda x: x / 60,
+        ("seconds", "hour"): lambda x: x / 3600,
+        ("minute", "seconds"): lambda x: x * 60,
+        ("minute", "hour"): lambda x: x / 60,
+        ("hour", "seconds"): lambda x: x * 3600,
+        ("hour", "minute"): lambda x: x * 60,
+    }
+
     def __init__(self, filepaths: list[str | Path]):
+        self.rtime_unit = None
         self.spectra = self._read_mzml_files(filepaths)
+
+    def _configure_retention_time_unit(self, unit):
+        if unit not in self.VALID_RT_UNITS:
+            raise ValueError(
+                f"Unknown retention time unit. Expected one of:"
+                f" seconds, minute, or hour. Received {unit}"
+            )
+        return unit
+
+    def _configure_retention_time(self, rtime, unit):
+        unit = self._configure_retention_time_unit(unit)
+
+        # establish the target unit
+        if self.rtime_unit is None:
+            self.rtime_unit = unit
+            return float(rtime)
+
+        if self.rtime_unit == unit:
+            return float(rtime)
+
+        return self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
 
     def _read_mzml_files(self, filepaths: list[str | Path]):
         spectra = []
         for file in filepaths:
             run = pymzml.run.Reader(file)
             for i, spec in enumerate(run):
-                match spec.scan_time[1]:
-                    case "seconds":
-                        rtime_unit = "seconds"
-                    case "minute":
-                        rtime_unit = "minute"
-                    case "hour":
-                        rtime_unit = "hour"
-                    case _:
-                        raise ValueError(
-                            f"Unknown retention time unit. Expected one of:"
-                            f" seconds, minute, or hour. Received {spec.scan_time[1]}"
-                        )
+                rtime = self._configure_retention_time(spec.scan_time[0], spec.scan_time[1])
 
                 try:
                     polarity = 0 if spec["negative scan"] else 1
@@ -40,13 +62,13 @@ class Spectra:
                     Spectrum(
                         spectrum_index=spec.index,
                         ms_level=spec.ms_level,
-                        rtime=spec.scan_time[0],
+                        rtime=rtime,
                         scan_index=spec.ID,
                         file=Path(run.path_or_file),
                         mz=spec.mz,
                         intensity=spec.i,
                         polarity=polarity,
-                        rtime_unit=rtime_unit,
+                        rtime_unit=self.rtime_unit,
                     )
                 )
 
@@ -62,5 +84,5 @@ class Spectrum:
     file: Path
     mz: npt.NDArray[np.float64]
     intensity: npt.NDArray[np.float64]
-    polarity: Literal[0, 1]
+    polarity: Literal[0, 1, -1]
     rtime_unit: str
