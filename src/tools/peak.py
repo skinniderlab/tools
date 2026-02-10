@@ -85,7 +85,7 @@ class Peaks:
                 logging.warning(f"Unable to parse formula: {row.formula}")
 
             peak_info[row.peak_id] = Peak(
-                id=row.peak_id,
+                peak_id=row.peak_id,
                 mz=row.mz,
                 rt=row.rt,
                 formula=computed_formula,
@@ -98,7 +98,7 @@ class Peaks:
 
 @dataclass(frozen=True)
 class Peak:
-    id: int | str
+    peak_id: int | str
     mz: float
     rt: float
     formula: Compound | None = None

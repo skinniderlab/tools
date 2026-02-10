@@ -3,7 +3,7 @@ from tools import Peak, Compound
 
 def test_peaks_object(isotope_db, peaks):
     peak = Peak(
-        id=1,
+        peak_id=1,
         mz=288.908623547669,
         rt=64.8,
     )
@@ -14,7 +14,7 @@ def test_peaks_object(isotope_db, peaks):
 
 def test_peak_instantiation(isotope_db, peaks):
     peak_1 = Peak(
-        id=28,
+        peak_id=28,
         mz=256.961023547669,
         rt=109.2,
         level=4.0,
@@ -22,7 +22,7 @@ def test_peak_instantiation(isotope_db, peaks):
         formula=Compound.from_str("C5H6O10S1", isotope_db),
     )
     peak_2 = Peak(
-        id=1089,
+        peak_id=1089,
         mz=387.096923547669,
         rt=159.0,
         annotation="Peak 2807 C9H25N4O2P1 + H2K1O4P1 -> C9H27K1N4O6P2",
@@ -35,7 +35,7 @@ def test_peak_instantiation(isotope_db, peaks):
 
 def test_peak_2(peaks_2, isotope_db):
     peak = Peak(
-        id="131.046249_11.059",
+        peak_id="131.046249_11.059",
         mz=131.046249,
         rt=11.059,
     )

@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tools import Database, IsotopeDB, Peaks
+from tools import Database, IsotopeDB, Peaks, Spectra
 
 np.set_printoptions(legacy="1.25")
 
@@ -31,6 +31,20 @@ def peaks_2(data_dir):
     """Peaks instance initialized with different test data for validating class methods."""
     return Peaks(filepath=data_dir / "peaks_2.csv", isotope_filepath=data_dir / "iso_list.csv")
 
+
+@pytest.fixture
+def spectra(data_dir):
+    """Spectra instance initialized with test data for validating class methods."""
+    return Spectra(
+        filepaths=[
+            data_dir / "Blank1A.mzML",
+            data_dir / "GAS01.mzML",
+            data_dir / "GB01.mzML",
+            data_dir / "L01.mzML",
+            data_dir / "LB01.mzML",
+            data_dir / "T01A.mzML",
+            ]
+    )
 
 @pytest.fixture
 def database_obj(data_dir, isotope_db):
