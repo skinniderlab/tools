@@ -11,7 +11,7 @@ from tools.utils import get_decoy_info, modify_formula_dict, str_to_dict
 class IsotopeDB:
     """A list of elements from the isotopes database."""
 
-    FILEPATH = Path(__file__).parent.parent / "data/iso_list.csv"
+    FILEPATH = Path(__file__).parent.parent.parent / "data/iso_list.csv"
 
     def __init__(self, filepath: Path = None):
         """
