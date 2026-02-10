@@ -51,7 +51,7 @@ class Peaks:
             )
 
         if "peak_id" not in df.columns:
-            df["peak_id"] = df.apply(lambda x: f"{x[mz_col]}_{x[rt_col]}", axis=1)
+            df["peak_id"] = df[mz_col].map("{:.4f}".format) + "_" + df[rt_col].map("{:.4f}".format)
 
         if len(df) != df.peak_id.nunique():
             raise ValueError(

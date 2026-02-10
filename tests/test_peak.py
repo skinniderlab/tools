@@ -34,12 +34,7 @@ def test_peak_instantiation(isotope_db, peaks):
 
 
 def test_peak_2(peaks_2, isotope_db):
-    peak = Peak(
-        peak_id="131.046249_11.059",
-        mz=131.046249,
-        rt=11.059,
-        smiles='C(CNC(=O)N)C(=O)O'
-    )
-    assert peaks_2["131.046249_11.059"] == peak
+    peak = Peak(peak_id="131.0462_11.0590", mz=131.046249, rt=11.059, smiles="C(CNC(=O)N)C(=O)O")
+    assert peaks_2["131.0462_11.0590"] == peak
     assert peak in peaks_2
-    assert "131.046249_11.059" in peaks_2
+    assert "131.0462_11.0590" in peaks_2
