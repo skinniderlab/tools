@@ -25,6 +25,20 @@ class Spectra:
         self.rtime_unit = None
         self.spectra = self._read_mzml_files(filepaths)
 
+    def __len__(self) -> int:
+        return len(self.spectra)
+
+    def __iter__(self):
+        return iter(self.spectra.values())
+
+    def __getitem__(self, index: int):
+        if (query_index := self.spectra.get(index, None)) is None:
+            raise KeyError(
+                f"Spectrum with spectrum index {index} not provided in the provided mzml files. "
+            )
+
+        return query_index
+
     def _configure_retention_time_unit(self, unit):
         if unit not in self.VALID_RT_UNITS:
             raise ValueError(
@@ -47,7 +61,7 @@ class Spectra:
         return self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
 
     def _read_mzml_files(self, filepaths: list[str | Path]):
-        spectra = []
+        spectra = {}
         for file in filepaths:
             run = pymzml.run.Reader(file)
             for i, spec in enumerate(run):
@@ -58,18 +72,16 @@ class Spectra:
                 except KeyError:
                     polarity = -1
 
-                spectra.append(
-                    Spectrum(
-                        spectrum_index=spec.index,
-                        ms_level=spec.ms_level,
-                        rtime=rtime,
-                        scan_index=spec.ID,
-                        file=Path(run.path_or_file),
-                        mz=spec.mz,
-                        intensity=spec.i,
-                        polarity=polarity,
-                        rtime_unit=self.rtime_unit,
-                    )
+                spectra[spec.index] = Spectrum(
+                    spectrum_index=spec.index,
+                    ms_level=spec.ms_level,
+                    rtime=rtime,
+                    scan_index=spec.ID,
+                    file=Path(run.path_or_file),
+                    mz=spec.mz,
+                    intensity=spec.i,
+                    polarity=polarity,
+                    rtime_unit=self.rtime_unit,
                 )
 
         return spectra
