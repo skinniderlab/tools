@@ -43,8 +43,9 @@ def spectra(data_dir):
             data_dir / "L01.mzML",
             data_dir / "LB01.mzML",
             data_dir / "T01A.mzML",
-            ]
+        ]
     )
+
 
 @pytest.fixture
 def database_obj(data_dir, isotope_db):
