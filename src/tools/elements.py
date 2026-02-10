@@ -11,7 +11,9 @@ from tools.utils import get_decoy_info, modify_formula_dict, str_to_dict
 class IsotopeDB:
     """A list of elements from the isotopes database."""
 
-    def __init__(self, filepath: Path):
+    FILEPATH = Path(__file__).parent.parent / "data/iso_list.csv"
+
+    def __init__(self, filepath: Path = None):
         """
         Initialize a list of elements.
 
@@ -21,6 +23,7 @@ class IsotopeDB:
             Path to the isotope file.
 
         """
+        filepath = self.FILEPATH if filepath is None else filepath
         self.filename = filepath.stem
         self.elements: list[Element] = []
         self._parse_file(filepath)

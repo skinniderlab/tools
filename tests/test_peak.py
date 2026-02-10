@@ -1,4 +1,4 @@
-from tools import Peak
+from tools import Peak, Compound
 
 
 def test_peaks_object(isotope_db, peaks):
@@ -6,7 +6,6 @@ def test_peaks_object(isotope_db, peaks):
         id=1,
         mz=288.908623547669,
         rt=64.8,
-        isotope_db=isotope_db,
     )
 
     assert peak in peaks, "Peaks object returned inaccurate membership result. "
@@ -20,16 +19,14 @@ def test_peak_instantiation(isotope_db, peaks):
         rt=109.2,
         level=4.0,
         annotation="HMDB0060649 Ascorbic acid 2-sulfate C6H8O9S1 + O1 -> C6H8O10S1 - C1H2 -> C5H6O10S1",
-        formula_str="C5H6O10S1",
-        isotope_db=isotope_db,
+        formula=Compound.from_str("C5H6O10S1", isotope_db),
     )
     peak_2 = Peak(
         id=1089,
         mz=387.096923547669,
         rt=159.0,
         annotation="Peak 2807 C9H25N4O2P1 + H2K1O4P1 -> C9H27K1N4O6P2",
-        formula_str="C9H27O6N4P2K",
-        isotope_db=isotope_db,
+        formula=Compound.from_str("C9H27O6N4P2K", isotope_db),
     )
 
     assert peaks[28] == peak_1
@@ -41,7 +38,6 @@ def test_peak_2(peaks_2, isotope_db):
         id="131.046249_11.059",
         mz=131.046249,
         rt=11.059,
-        isotope_db=isotope_db,
     )
     assert peaks_2["131.046249_11.059"] == peak
     assert peak in peaks_2

@@ -3,11 +3,12 @@ from dataclasses import InitVar, dataclass, field
 import pandas as pd
 
 from tools import Compound, IsotopeDB
+import logging
 
 
 class Peaks:
-    def __init__(self, filepath, isotope_db):
-        self.isotope_db = isotope_db
+    def __init__(self, filepath, isotope_filepath: str = None):
+        self.isotope_db = IsotopeDB(isotope_filepath)
         self.peaks = self._process_peaks(filepath)
 
     def __len__(self):
@@ -71,19 +72,28 @@ class Peaks:
     def _process_peaks(self, filepath):
         df = self._read_and_validate(filepath)
 
-        return {
-            row.peak_id: Peak(
+        peak_info = {}
+        for row in df.itertuples():
+            computed_formula = None
+            try:
+                if row.formula is not None:
+                    computed_formula = Compound.from_str(
+                        formula=row.formula, isotope_db=self.isotope_db
+                    )
+            except ValueError:
+                # ignore invalid formulas
+                logging.warning(f"Unable to parse formula: {row.formula}")
+
+            peak_info[row.peak_id] = Peak(
                 id=row.peak_id,
                 mz=row.mz,
                 rt=row.rt,
-                formula_str=row.formula,
+                formula=computed_formula,
                 level=row.level,
                 accession=row.accession,
-                isotope_db=self.isotope_db,
                 annotation=row.annotation,
             )
-            for row in df.itertuples()
-        }
+        return peak_info
 
 
 @dataclass(frozen=True)
@@ -91,20 +101,7 @@ class Peak:
     id: int | str
     mz: float
     rt: float
-    isotope_db: InitVar[IsotopeDB]
-    formula_str: InitVar[str | None] = None
+    formula: Compound | None = None
     accession: str | None = None
     level: int | None = None
     annotation: str | None = None
-    formula: Compound | None = field(init=False, default=None)
-
-    def __post_init__(self, isotope_db, formula_str):
-        computed_formula = None
-        try:
-            if formula_str is not None:
-                computed_formula = Compound.from_str(formula=formula_str, isotope_db=isotope_db)
-        except ValueError:
-            # ignore invalid formulas
-            pass
-
-        object.__setattr__(self, "formula", computed_formula)
