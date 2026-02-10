@@ -72,6 +72,8 @@ class Peaks:
     def _process_peaks(self, filepath):
         df = self._read_and_validate(filepath)
 
+        has_smiles = True if "true_SMILES" in df.columns else False
+
         peak_info = {}
         for row in df.itertuples():
             computed_formula = None
@@ -92,6 +94,7 @@ class Peaks:
                 level=row.level,
                 accession=row.accession,
                 annotation=row.annotation,
+                smiles=row.true_SMILES if has_smiles else None,
             )
         return peak_info
 
@@ -105,3 +108,4 @@ class Peak:
     accession: str | None = None
     level: int | None = None
     annotation: str | None = None
+    smiles: str | None = None

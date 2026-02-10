@@ -38,6 +38,7 @@ def test_peak_2(peaks_2, isotope_db):
         peak_id="131.046249_11.059",
         mz=131.046249,
         rt=11.059,
+        smiles='C(CNC(=O)N)C(=O)O'
     )
     assert peaks_2["131.046249_11.059"] == peak
     assert peak in peaks_2
