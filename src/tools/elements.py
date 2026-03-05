@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
+from importlib.resources import files
 from pathlib import Path
 
 import numpy as np
@@ -11,7 +12,7 @@ from tools.utils import get_decoy_info, modify_formula_dict, str_to_dict
 class IsotopeDB:
     """A list of elements from the isotopes database."""
 
-    FILEPATH = Path(__file__).parent.parent.parent / "data/iso_list.csv"
+    DATA_FILE = files("tools.data").joinpath("iso_list.csv")
 
     def __init__(self, filepath: Path = None):
         """
@@ -23,7 +24,7 @@ class IsotopeDB:
             Path to the isotope file.
 
         """
-        filepath = self.FILEPATH if filepath is None else filepath
+        filepath = self.DATA_FILE if filepath is None else filepath
         self.filename = filepath.stem
         self.elements: list[Element] = []
         self._parse_file(filepath)
