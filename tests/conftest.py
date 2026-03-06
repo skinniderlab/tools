@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
+import warnings
 from tools import Database, IsotopeDB, Peaks, Spectra
 
 np.set_printoptions(legacy="1.25")
@@ -64,3 +64,8 @@ def seed():
     This prevents individual tests that use set_seed from affecting each other.
     """
     np.random.seed(0)
+
+@pytest.fixture(scope="session", autouse=True)
+def ignore_warnings():
+    """Ignore all the deprecation warnings."""
+    warnings.filterwarnings(action="ignore", category=DeprecationWarning, module="pymzml")
