@@ -56,6 +56,7 @@ def test_get_adducts(data_dir, database_obj):
         ],
     )
 
+    df_adducts = df_adducts.sort_values(by=["mass"]).reset_index(drop=True)
     # The resulting dataframe is too large so we're only testing 100 randomly selected columns
     result = df_adducts.sample(n=100, random_state=0, ignore_index=True)
     expected = pd.read_pickle(data_dir / "database_get_adducts_result.pkl")
