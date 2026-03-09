@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from tools.utils import get_decoy_info, modify_formula_dict, str_to_dict
+from tools.utils import get_decoy_info, modify_formula_dict, str_to_dict, get_formula, get_charge
 
 
 class IsotopeDB:
@@ -81,7 +81,7 @@ class Compound:
 
     VALID_ELEMENTS = ("C", "H", "O", "N", "P", "S", "F", "Cl", "Br", "I")
 
-    def __init__(self, formula: dict, isotope_db: IsotopeDB):
+    def __init__(self, formula: dict, isotope_db: IsotopeDB, charge: int = 0):
         """
         Initializes a compound.
 
@@ -89,27 +89,35 @@ class Compound:
         ----------
         formula: dict
             A dictionary mapping each element to its corresponding atom count.
+
         isotope_db: Elements
             Elements object consting a list of elements from the isotopes database.
+
+        charge: int or None, optional
+            The net charge of the compound. Use 0 if the compound is neutral or if
+            no charge information is available.
         """
         self.isotope_db = isotope_db
-        self.element_count: dict[Element, int] = {}
-        self.formula: str = ""
+        self.charge = charge
+        self.element_count = self._order_elements(formula)
+        self.formula: str = get_formula(self.element_count, self.charge)
         self.monomass = 0
         self.monoabund = 1
         self.monoisos: list[Isotope] = []
         self.nonmonoisos: list[Isotope] = []
 
-        self.order_elements(formula)
         self._compute_mass_and_abundance()
         self._parse_isotopes()
 
     @classmethod
     def from_str(cls, formula: str, isotope_db: IsotopeDB):
-        return cls(str_to_dict(formula), isotope_db)
+        return cls(str_to_dict(formula), isotope_db, get_charge(formula))
+
+    def __lt__(self, other):
+        return self.formula < other.formula
 
     def __hash__(self):
-        return hash((self.formula, self.monomass, tuple(self.monoisos)))
+        return hash(self.formula)
 
     def __repr__(self):
         return self.formula
@@ -130,7 +138,7 @@ class Compound:
     def __getitem__(self, item):
         return self.element_count[item]
 
-    def order_elements(self, formula: dict) -> None:
+    def _order_elements(self, formula: dict) -> dict["Element", int]:
         """
         Parses the dictionary mapping elements (in string representation)
         to its atom counts (including 0) in a compound, and sorts elements according to
@@ -146,14 +154,15 @@ class Compound:
 
         Returns
         -------
-        None
+        dict[Element, int]
+            Dictionary mapping elements (in string representation) to atom counts
+            ordered according to the Hill System.
         """
 
         order = dict.fromkeys(self.VALID_ELEMENTS, 0)
 
         # Keys in self.dict are sorted in the order described by VALID_ELEMENTS tuple
-        self.element_count = {self.isotope_db[k]: v for k, v in (order | formula).items() if v != 0}
-        self.formula = "".join(f"{k}{'' if v == 1 else v}" for k, v in self.element_count.items())
+        return {self.isotope_db[k]: v for k, v in (order | formula).items() if v != 0}
 
     def _parse_isotopes(self):
         """
@@ -184,7 +193,6 @@ class Compound:
 
     def isopattern(
         self,
-        charge: int,
         abundance_limit: float,
         max_iter: int,
         get_details: bool = False,
@@ -196,8 +204,6 @@ class Compound:
 
         Parameters
         ----------
-        charge: int
-            Net charge of the specified compound.
         abundance_limit: float
             Minimum relative abundance threshold for including isotopic peaks in the pattern.
         max_iter: int
@@ -285,9 +291,11 @@ class Compound:
                 peaks = pd.concat([peaks.assign(stop=1), over_limit], ignore_index=True)
 
         peaks = peaks[peaks.abundance != 0]
-        peaks["charge"] = charge
-        if charge != 0:
-            peaks["mass"] = (peaks["mass"] - (5.486 * (10 ** (-4)) * charge)) / abs(charge)
+        peaks["charge"] = self.charge
+        if self.charge != 0:
+            peaks["mass"] = (peaks["mass"] - (5.486 * (10 ** (-4)) * self.charge)) / abs(
+                self.charge
+            )
 
         if scale == "rel":
             peaks["abundance"] = (

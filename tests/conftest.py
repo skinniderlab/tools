@@ -65,6 +65,7 @@ def seed():
     """
     np.random.seed(0)
 
+
 @pytest.fixture(scope="session", autouse=True)
 def ignore_warnings():
     """Ignore all the deprecation warnings."""

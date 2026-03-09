@@ -64,17 +64,19 @@ class Spectra:
                 except KeyError:
                     polarity = -1
 
-                spectra.append(Spectrum(
-                    spectrum_index=spec.index,
-                    ms_level=spec.ms_level,
-                    rtime=rtime,
-                    scan_index=spec.ID,
-                    file=Path(run.path_or_file),
-                    mz=spec.mz,
-                    intensity=spec.i,
-                    polarity=polarity,
-                    rtime_unit=self.rtime_unit,
-                ))
+                spectra.append(
+                    Spectrum(
+                        spectrum_index=spec.index,
+                        ms_level=spec.ms_level,
+                        rtime=rtime,
+                        scan_index=spec.ID,
+                        file=Path(run.path_or_file),
+                        mz=spec.mz,
+                        intensity=spec.i,
+                        polarity=polarity,
+                        rtime_unit=self.rtime_unit,
+                    )
+                )
         return spectra
 
 

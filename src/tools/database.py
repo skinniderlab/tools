@@ -5,6 +5,7 @@ import pandas as pd
 
 from tools.elements import Compound, IsotopeDB
 from tools.utils import get_adducts, get_file_delimiter, modify_formula_dict
+import re
 
 
 class Database:
@@ -52,6 +53,20 @@ class Database:
         self.isotope_db = isotope_db
         self.df = self._load_database(db_filepath, isotope_db)
 
+    def __getitem__(self, item: Compound | str):
+        result = self.df.get(item)
+        if result is not None:
+            return result
+
+        raise KeyError(f"{item} not found")
+
+    def __contains__(self, item: Compound | str):
+        try:
+            self[item]
+        except KeyError:
+            return False
+        return True
+
     @staticmethod
     def _load_database(db_filepath: Path, isotope_db: IsotopeDB) -> pd.DataFrame:
         """
@@ -85,8 +100,11 @@ class Database:
             )
 
         # Convert every formula_dictionary to compound objects
-        db["compound"] = db[elements].apply(lambda x: Compound(x.to_dict(), isotope_db), axis=1)
-        return db[["mass", "charge", "size", "smiles", "compound"]]
+        db["compound"] = db.apply(
+            lambda x: Compound(x[elements].to_dict(), isotope_db, x.charge), axis=1
+        )
+        db = db[["mass", "charge", "size", "smiles", "compound"]]
+        return {formula: df for formula, df in db.groupby("compound")}
 
     def get_adducts(self, adducts_to_consider: list) -> pd.DataFrame:
         """
@@ -117,7 +135,7 @@ class Database:
         ----------
         https://fiehnlab.ucdavis.edu/staff/kind/metabolomics/ms-adduct-calculator/
         """
-        df = self.df.copy()
+        df = pd.concat([v for v in self.df.values()]).reset_index(drop=True)
 
         def _compute_adduct_mass_to_charge(row: pd.Series, adduct: str) -> tuple | None:
             """
@@ -151,7 +169,7 @@ class Database:
             return None
 
         for adduct in adducts_to_consider:
-            df[adduct] = self.df.apply(_compute_adduct_mass_to_charge, adduct=adduct, axis=1)
+            df[adduct] = df.apply(_compute_adduct_mass_to_charge, adduct=adduct, axis=1)
 
         return df
 

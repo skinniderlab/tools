@@ -4,10 +4,12 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
+from tools import Compound
 from tools.database import Database
+from tools.utils import get_element_count
 
 
-def test_load_database(data_dir, database_obj):
+def test_load_database(data_dir, database_obj, isotope_db):
     """
     Checks whether the database object correctly loads and
     parses the specified file.
@@ -15,8 +17,17 @@ def test_load_database(data_dir, database_obj):
     Note: The loading method is called in the constructor,
     so testing the conftest fixture is sufficient.
     """
+    df = (
+        pd.concat([i for i in database_obj.df.values()])
+        .sort_values(by="mass")
+        .reset_index(drop=True)
+    )
     expected_db = pd.read_pickle(data_dir / "database_load_result.pkl")
-    assert_frame_equal(database_obj.df, expected_db)
+    expected_db = expected_db.sort_values(by="mass").reset_index(drop=True)
+    expected_db["compound"] = expected_db.apply(
+        lambda x: Compound(get_element_count(x.compound.formula), isotope_db, x.charge), axis=1
+    )
+    assert_frame_equal(df, expected_db)
 
 
 def test_load_database_error(data_dir, isotope_db):
@@ -28,10 +39,10 @@ def test_load_database_error(data_dir, isotope_db):
     just initializing the class is sufficient.
     """
     with pytest.raises(
-            ValueError,
-            match=re.escape(
-                "Elements in the formula database must not be anything other than: ('C', 'H', 'O', 'N', 'P', 'S', 'F', 'Cl', 'Br', 'I')"
-            ),
+        ValueError,
+        match=re.escape(
+            "Elements in the formula database must not be anything other than: ('C', 'H', 'O', 'N', 'P', 'S', 'F', 'Cl', 'Br', 'I')"
+        ),
     ):
         Database(
             db_filepath=data_dir / "database_load_error.csv",
@@ -40,7 +51,7 @@ def test_load_database_error(data_dir, isotope_db):
         )
 
 
-def test_get_adducts(data_dir, database_obj):
+def test_get_adducts(data_dir, database_obj, isotope_db):
     """Checks whether the `get_adducts` function correctly computes and populates m/z values."""
 
     df_adducts = database_obj.get_adducts(
@@ -63,6 +74,9 @@ def test_get_adducts(data_dir, database_obj):
 
     # Just updating column names of expected dataframe to make sure the values are matching
     expected.columns = result.columns
+    expected["compound"] = expected.apply(
+        lambda x: Compound(get_element_count(x.compound.formula), isotope_db, x.charge), axis=1
+    )
 
     assert_frame_equal(result, expected)
 

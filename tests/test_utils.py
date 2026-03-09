@@ -8,6 +8,7 @@ from tools.utils import (
     modify_charge,
     modify_formula_dict,
     remove_noise,
+    get_charge,
 )
 
 
@@ -194,3 +195,23 @@ def test_remove_noise():
     for i, spec in enumerate(spectra):
         result = remove_noise(spec, noise=noises[i])
         assert np.allclose(expected_results[i], result)
+
+
+def test_get_charge():
+    """
+    Checks whether the `get_charge` function accurately parses
+    and ionic charge values from a provided list of compound in
+    string format.
+    """
+    formulas = {
+        "C4H9NO2+": 1,
+        "C11H19NO9": 0,
+        "C22H36O2": 0,
+        "C20H38O2-": -1,
+        "C22H32O2-2": -2,
+        "C15H33N5O3+3": 3,
+    }
+
+    for k, v in formulas.items():
+        result = get_charge(k)
+        assert result == v

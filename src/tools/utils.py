@@ -272,3 +272,34 @@ def str_to_dict(formula: str) -> dict:
         raise ValueError(f"No valid elements found in formula: '{formula}'")
 
     return result
+
+
+def get_charge(formula: str) -> int:
+    """
+    Given a chemical formula in string format, this method
+    parses and returns its ionic charge.
+    """
+    pattern = re.compile(r"([+-])(\d*)$")
+    match = pattern.search(formula)
+
+    if match is None:
+        return 0
+
+    sign, magnitude = match.groups()
+
+    magnitude = int(magnitude) if magnitude else 1
+    return magnitude if sign == "+" else -magnitude
+
+
+def get_formula(element_count: dict[str, int], charge: int):
+    """
+    Construct a chemical formula string from element counts
+    and ionic charge.
+    """
+    formula = "".join(f"{k}{'' if v == 1 else v}" for k, v in element_count.items())
+    if charge:
+        sign = "+" if charge > 0 else "-"
+        magnitude = "" if abs(charge) == 1 else str(abs(charge))
+        formula += sign + magnitude
+
+    return formula
