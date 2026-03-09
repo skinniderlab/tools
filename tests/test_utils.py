@@ -9,6 +9,7 @@ from tools.utils import (
     modify_formula_dict,
     remove_noise,
     get_charge,
+    get_formula,
 )
 
 
@@ -197,13 +198,31 @@ def test_remove_noise():
         assert np.allclose(expected_results[i], result)
 
 
+def test_get_formula():
+    """
+    Checks whether the `get_formula` correctly formats the
+    given element-count dictionary and charge into a valid
+    chemical formula string.
+    """
+    element_counts_and_charges = [
+        ({"Pb": 1, "N": 2, "O": 6}, 2.0),
+        ({"C": 4, "H": 12, "S": 2, "O": 2}, 0),
+        ({"C": 4, "H": 12, "S": 2, "O": 2}, -1),
+        ({"C": 4, "H": 12, "S": 2, "O": 2}, -1.0),
+    ]
+    expected = ["PbN2O6+2", "C4H12S2O2", "C4H12S2O2-", "C4H12S2O2-"]
+    for i, (element_count, charge) in enumerate(element_counts_and_charges):
+        result = get_formula(element_count, charge)
+        assert result == expected[i]
+
+
 def test_get_charge():
     """
     Checks whether the `get_charge` function accurately parses
     and ionic charge values from a provided list of compound in
     string format.
     """
-    formulas = {
+    formulas_to_charges = {
         "C4H9NO2+": 1,
         "C11H19NO9": 0,
         "C22H36O2": 0,
@@ -212,6 +231,6 @@ def test_get_charge():
         "C15H33N5O3+3": 3,
     }
 
-    for k, v in formulas.items():
+    for k, v in formulas_to_charges.items():
         result = get_charge(k)
         assert result == v

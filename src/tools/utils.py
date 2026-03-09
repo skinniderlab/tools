@@ -299,7 +299,7 @@ def get_formula(element_count: dict[str, int], charge: int):
     formula = "".join(f"{k}{'' if v == 1 else v}" for k, v in element_count.items())
     if charge:
         sign = "+" if charge > 0 else "-"
-        magnitude = "" if abs(charge) == 1 else str(abs(charge))
+        magnitude = "" if abs(charge) == 1 else str(abs(int(charge)))
         formula += sign + magnitude
 
     return formula
