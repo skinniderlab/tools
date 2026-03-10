@@ -8,6 +8,7 @@ import pandas as pd
 
 from tools.utils import get_decoy_info, modify_formula_dict, str_to_dict, get_formula, get_charge
 
+ELECTRON_MASS = 5.486e-4
 
 class IsotopeDB:
     """A list of elements from the isotopes database."""
@@ -195,6 +196,7 @@ class Compound:
         self,
         abundance_limit: float,
         max_iter: int,
+        apply_charges: bool = True,
         get_details: bool = False,
         scale: str = "abs",
     ) -> np.ndarray:
@@ -222,29 +224,27 @@ class Compound:
             monoisotopic peak to a specified non-monoisotopic peak.
             """
 
-            if row.stop == 1:
+            if row.stop or pd.isna(row.noniso):
                 return row
 
-            if not pd.isna(row.noniso):
-                nonmono = row.noniso
-                monoiso = self.isotope_db[nonmono].monoisotope
+            row = row.copy()
+            nonmono = row.noniso
+            monoiso = self.isotope_db[nonmono].monoisotope
 
-                if row[monoiso] == 0:
-                    return pd.Series(None, index=row.index)
+            if row[monoiso] == 0:
+                return pd.Series(None, index=row.index)
 
-                row.mass = row.mass - monoiso.mass + nonmono.mass
+            row.mass = row.mass - monoiso.mass + nonmono.mass
 
-                monoiso_abund_proportion = row[monoiso] / monoiso.abundance
-                row.abundance = row.abundance * (
-                    nonmono.abundance / (row[nonmono] + 1) * monoiso_abund_proportion
-                )
+            mono_proportion = row[monoiso] / monoiso.abundance
+            row.abundance *= (nonmono.abundance / (row[nonmono] + 1) * mono_proportion)
 
-                row[monoiso] -= 1
-                row[nonmono] += 1
-                row.generation += 1
+            row[monoiso] -= 1
+            row[nonmono] += 1
+            row.generation += 1
 
-                if row.abundance < limit:
-                    row.stop = 1
+            if row.abundance < limit:
+                row.stop = 1
 
             return row
 
@@ -284,24 +284,18 @@ class Compound:
 
             # Combine other permutations of non abundant isotopes with the filtered one
             if not over_limit.empty:
-                for row in over_limit.itertuples():
-                    over_limit.at[row.Index, "noniso"] = self.nonmonoisos
-
+                over_limit = over_limit.assign(noniso=[self.nonmonoisos] * len(over_limit))
                 over_limit = over_limit.explode(["noniso"])
                 peaks = pd.concat([peaks.assign(stop=1), over_limit], ignore_index=True)
 
-        peaks = peaks[peaks.abundance != 0]
         peaks["charge"] = self.charge
-        if self.charge != 0:
-            peaks["mass"] = (peaks["mass"] - (5.486 * (10 ** (-4)) * self.charge)) / abs(
-                self.charge
-            )
+        if self.charge != 0 and apply_charges:
+            peaks["mass"] = (peaks["mass"] - ELECTRON_MASS * self.charge) / abs(self.charge)
+
 
         if scale == "rel":
-            peaks["abundance"] = (
-                100
-                * (peaks.abundance - peaks.abundance.min())
-                / (peaks.abundance.max() - peaks.abundance.min())
+            peaks["abundance"] = peaks.abundance.pipe(
+                lambda x: 100 * (x - x.min()) / (x.max() - x.min())
             )
             peaks = peaks.sort_values("abundance", ascending=False).reset_index(drop=True)
         else:
