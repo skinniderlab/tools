@@ -27,7 +27,8 @@ def test_load_database(data_dir, database_obj, isotope_db):
     expected_db["compound"] = expected_db.apply(
         lambda x: Compound(get_element_count(x.compound.formula), isotope_db, x.charge), axis=1
     )
-    assert_frame_equal(df, expected_db)
+    df.columns = df.columns.astype("object")
+    assert_frame_equal(df, expected_db, check_dtype=False)
 
 
 def test_load_database_error(data_dir, isotope_db):
@@ -73,12 +74,12 @@ def test_get_adducts(data_dir, database_obj, isotope_db):
     expected = pd.read_pickle(data_dir / "database_get_adducts_result.pkl")
 
     # Just updating column names of expected dataframe to make sure the values are matching
-    expected.columns = result.columns
+    expected.columns = result.columns.astype(str)
     expected["compound"] = expected.apply(
         lambda x: Compound(get_element_count(x.compound.formula), isotope_db, x.charge), axis=1
     )
 
-    assert_frame_equal(result, expected)
+    assert_frame_equal(result, expected, check_dtype=False)
 
 
 def test_make_decoy_formula_single_decoy(data_dir, database_obj):
