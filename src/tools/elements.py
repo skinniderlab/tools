@@ -307,6 +307,8 @@ class Compound:
         else:
             peaks = peaks.sort_values("mass").reset_index(drop=True)
 
+
+        peaks.columns = peaks.columns.astype(str)
         if get_details:
             return peaks.loc[:, ~peaks.columns.isin(["generation", "stop", "noniso"])]
 
