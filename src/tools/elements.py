@@ -52,9 +52,22 @@ class IsotopeDB:
 
     def get_mass_update(self, element):
         """
-        Returns the mass adjustment required for a given decoy string.
+        Return the mass adjustment for a given decoy string.
 
-        :raises ValueError: if decoy string doesn't follow '[+/-][d][Element]'.
+        Parameters
+        ----------
+        element : str
+            Decoy string in the format '[+/-][n][Element]', e.g. '+2C' or '-H'.
+
+        Returns
+        -------
+        float
+            Mass adjustment value for the specified element and multiplier.
+
+        Raises
+        ------
+        ValueError
+            If the decoy string does not follow '[+/-][n][Element]' format.
         """
 
         element, multiple, sign = get_decoy_info(element)
@@ -62,10 +75,22 @@ class IsotopeDB:
 
     def __getitem__(self, item):
         """
-        Retrieve an element from the list with either its string representation
-        or an isotope object.
+        Retrieve an element by its string symbol or Isotope object.
 
-        :raises ValueError: If the specified element is not present in the provided isotope file.
+        Parameters
+        ----------
+        item : str or Isotope
+            Element symbol or Isotope to look up.
+
+        Returns
+        -------
+        Element
+            The matching Element from the isotope database.
+
+        Raises
+        ------
+        KeyError
+            If the specified element is not present in the provided isotope file.
         """
         for element in self.elements:
             if element == item or item in element:
@@ -112,6 +137,22 @@ class Compound:
 
     @classmethod
     def from_str(cls, formula: str, isotope_db: IsotopeDB):
+        """
+        Construct a Compound from a formula string.
+
+        Parameters
+        ----------
+        formula : str
+            Chemical formula string, optionally including a charge suffix,
+            e.g. 'C6H12O6' or 'C2H4O2+'.
+        isotope_db : IsotopeDB
+            Isotope database used to look up element properties.
+
+        Returns
+        -------
+        Compound
+            A new Compound instance corresponding to the given formula.
+        """
         return cls(str_to_dict(formula), isotope_db, get_charge(formula))
 
     def __lt__(self, other):
@@ -206,16 +247,26 @@ class Compound:
 
         Parameters
         ----------
-        abundance_limit: float
+        abundance_limit : float
             Minimum relative abundance threshold for including isotopic peaks in the pattern.
-        max_iter: int
-            Maximum number of iteration allowed for generating the isotopic pattern.
+        max_iter : int
+            Maximum number of iterations allowed for generating the isotopic pattern.
+        apply_charges : bool, optional
+            Whether to adjust m/z values by the compound charge. Default is True.
+        get_details : bool, optional
+            If True, return a DataFrame with full isotope composition details instead of
+            just mass and abundance columns. Default is False.
+        scale : str, optional
+            Abundance scaling mode. Use 'rel' for relative scaling (0-100) sorted by
+            descending abundance, or 'abs' for absolute values sorted by mass.
+            Default is 'abs'.
 
         Returns
         -------
-        peaks: np.ndarray
-            Theoretical isotopic distribution of the compound, including the expected masses
-            and relative abundances.
+        np.ndarray
+            Theoretical isotopic distribution as an array of shape (n, 2) with columns
+            [mass, abundance]. If get_details is True, returns a pd.DataFrame instead
+            with full isotope composition columns.
         """
 
         def isotope_permutation(row: pd.Series, limit: float) -> pd.Series:
@@ -358,6 +409,24 @@ class Element:
         return any(item == isotope for isotope in self.isotopes)
 
     def __getitem__(self, item):
+        """
+        Retrieve an isotope of this element by its symbol.
+
+        Parameters
+        ----------
+        item : str
+            Symbol of the isotope or element to look up.
+
+        Returns
+        -------
+        Isotope
+            The matching Isotope object.
+
+        Raises
+        ------
+        KeyError
+            If the isotope symbol is not present in this element.
+        """
         if item == self.symbol:
             return self.monoisotope
         if isotope := self._isotope_lookup[item]:

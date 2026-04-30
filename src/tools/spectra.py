@@ -10,6 +10,8 @@ import numpy as np
 
 
 class Spectra:
+    """A collection of mass spectra parsed from one or more mzML files."""
+
     VALID_RT_UNITS = {"seconds", "minute", "hour"}
 
     CONVERSIONS = {
@@ -22,6 +24,14 @@ class Spectra:
     }
 
     def __init__(self, filepaths: list[str | Path]):
+        """
+        Initialize from a list of mzML file paths.
+
+        Parameters
+        ----------
+        filepaths : list[str or Path]
+            Paths to mzML files to parse.
+        """
         self.rtime_unit = None
         self.spectra = self._read_mzml_files(filepaths)
 
@@ -32,6 +42,24 @@ class Spectra:
         return iter(self.spectra)
 
     def _configure_retention_time_unit(self, unit):
+        """
+        Validate and return a retention time unit string.
+
+        Parameters
+        ----------
+        unit : str
+            Retention time unit to validate. Must be one of 'seconds', 'minute', or 'hour'.
+
+        Returns
+        -------
+        str
+            The validated unit string.
+
+        Raises
+        ------
+        ValueError
+            If the unit is not one of the accepted values.
+        """
         if unit not in self.VALID_RT_UNITS:
             raise ValueError(
                 f"Unknown retention time unit. Expected one of:"
@@ -40,6 +68,24 @@ class Spectra:
         return unit
 
     def _configure_retention_time(self, rtime, unit):
+        """
+        Convert a retention time value to the collection's established unit.
+
+        Sets the collection's unit from the first spectrum encountered, then converts
+        all subsequent values to match.
+
+        Parameters
+        ----------
+        rtime : float
+            Retention time value to convert.
+        unit : str
+            Unit of the provided retention time value.
+
+        Returns
+        -------
+        float
+            Retention time converted to the collection's established unit.
+        """
         unit = self._configure_retention_time_unit(unit)
 
         # establish the target unit
@@ -53,6 +99,19 @@ class Spectra:
         return self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
 
     def _read_mzml_files(self, filepaths: list[str | Path]):
+        """
+        Parse mzML files and return a list of Spectrum objects.
+
+        Parameters
+        ----------
+        filepaths : list[str or Path]
+            Paths to mzML files to parse.
+
+        Returns
+        -------
+        list[Spectrum]
+            Parsed spectra from all provided files.
+        """
         spectra = []
         for file in filepaths:
             run = pymzml.run.Reader(file)
@@ -82,6 +141,8 @@ class Spectra:
 
 @dataclass()
 class Spectrum:
+    """A single mass spectrum with associated metadata."""
+
     spectrum_index: int
     ms_level: int
     rtime: float

@@ -54,6 +54,24 @@ class Database:
         self.df = self._load_database(db_filepath, isotope_db)
 
     def __getitem__(self, item: Compound | str):
+        """
+        Retrieve database entries for a given compound.
+
+        Parameters
+        ----------
+        item : Compound or str
+            Compound object or formula string to look up.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame rows corresponding to the requested compound.
+
+        Raises
+        ------
+        KeyError
+            If the compound is not found in the database.
+        """
         result = self.df.get(item)
         if result is not None:
             return result
@@ -61,6 +79,19 @@ class Database:
         raise KeyError(f"{item} not found")
 
     def __contains__(self, item: Compound | str):
+        """
+        Check whether a compound is present in the database.
+
+        Parameters
+        ----------
+        item : Compound or str
+            Compound object or formula string to check.
+
+        Returns
+        -------
+        bool
+            True if the compound exists in the database, False otherwise.
+        """
         try:
             self[item]
         except KeyError:

@@ -8,8 +8,17 @@ import numpy as np
 
 def get_file_delimiter(filepath: Path) -> str:
     """
-    Identifies and returns the delimiter (comma, tab, or space) used to
-    separate values in the specified file.
+    Identify the delimiter used in a delimited text file.
+
+    Parameters
+    ----------
+    filepath : Path
+        Path to the file to inspect. Supports gzip-compressed files.
+
+    Returns
+    -------
+    str
+        The detected delimiter character: comma (','), tab ('\\t'), or space (' ').
     """
     f = gzip.open(filepath, "rt") if filepath.suffix == ".gz" else Path.open(filepath)  # noqa: SIM115
     first_line = next(f).strip()
@@ -25,8 +34,18 @@ def get_file_delimiter(filepath: Path) -> str:
 
 def get_file_info(filepath: Path) -> dict:
     """
-    Loads the experiment file from the specified filepath, containing
-    mass-to-charge ratios (m/z) and/or intensity data.
+    Load metadata from a delimited file containing m/z and/or intensity data.
+
+    Parameters
+    ----------
+    filepath : Path
+        Path to the file to inspect. Supports gzip-compressed files.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys 'delim', 'open_fn', 'mode', 'n_rows', 'n_columns',
+        and 'has_header'.
     """
 
     def _get_open_method(_filepath: Path):
@@ -53,8 +72,21 @@ def get_ppm_range(
     lower_bound: np.ndarray, upper_bound: np.ndarray, ppm_error: float
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Returns the m/z range around a specified peak, accounting for the
-    potential error due to the given ppm tolerance.
+    Expand an m/z range by a given ppm tolerance.
+
+    Parameters
+    ----------
+    lower_bound : np.ndarray
+        Lower m/z boundary values.
+    upper_bound : np.ndarray
+        Upper m/z boundary values.
+    ppm_error : float
+        Parts-per-million tolerance to apply.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Updated (lower_bound, upper_bound) after applying the ppm expansion.
     """
     lower_bound += -ppm_error / 1e6 * lower_bound
     upper_bound += ppm_error / 1e6 * upper_bound
@@ -62,13 +94,41 @@ def get_ppm_range(
 
 
 def calculate_ppm_error(observed_mz, theoretical_mz):
-    """Calculate the ppm error between two m/z values."""
+    """
+    Calculate the absolute ppm error between observed and theoretical m/z values.
+
+    Parameters
+    ----------
+    observed_mz : float or np.ndarray
+        Observed m/z value(s).
+    theoretical_mz : float or np.ndarray
+        Theoretical m/z value(s).
+
+    Returns
+    -------
+    float or np.ndarray
+        Absolute ppm error(s).
+    """
     return np.abs((observed_mz - theoretical_mz) / theoretical_mz) * 1e6
 
 
 def aggregate_dict_values(dict1, dict2):
     """
-    Merges two dictionaries by adding the values of matching keys.
+    Merge two dictionaries by summing values for matching keys.
+
+    Keys present in dict1 but not dict2 are added to dict2 with their value from dict1.
+
+    Parameters
+    ----------
+    dict1 : dict
+        Source dictionary whose values are added into dict2.
+    dict2 : dict
+        Target dictionary that is updated in place.
+
+    Returns
+    -------
+    dict
+        Updated dict2 containing merged values from both dictionaries.
     """
     for k, v in dict1.items():
         dict2[k] = dict2.get(k, 0) + v
@@ -77,13 +137,29 @@ def aggregate_dict_values(dict1, dict2):
 
 def get_element_count(formula: str) -> dict:
     """
-    Given a chemical formula in string format or an abbreviated form,
-    returns adictionary mapping element to respective amount.
+    Parse a chemical formula string into a dictionary of element counts.
 
-    Example:
-        'H2O' -> {'H': 2, 'O': 1}
-        'C6H12O6' -> {'C': 6, 'H': 12, 'O': 6}
-        'ACN' -> {'C': 2, 'H':3, 'N':1}
+    Supports common chemical abbreviations (e.g. 'ACN', 'DMSO') and formulas with
+    parenthetical groups (e.g. '(CH3)2SO').
+
+    Parameters
+    ----------
+    formula : str
+        Chemical formula or abbreviated compound name.
+
+    Returns
+    -------
+    dict[str, int]
+        Dictionary mapping element symbols to their counts.
+
+    Examples
+    --------
+    >>> get_element_count('H2O')
+    {'H': 2, 'O': 1}
+    >>> get_element_count('C6H12O6')
+    {'C': 6, 'H': 12, 'O': 6}
+    >>> get_element_count('ACN')
+    {'C': 2, 'H': 3, 'N': 1}
     """
     # Dictionary that maps common abbreviations of chemicals to their molecular formulas
     compound_abbreviations = {
@@ -138,10 +214,20 @@ def get_element_count(formula: str) -> dict:
 
 def modify_formula_dict(formula_dict: dict, adduct: str) -> dict | None:
     """
-    Given a dictionary that maps elements to their respective counts in a
-    chemical formula, and an adduct represented as a string, updates the
-    element counts by applying the additions and/or subtractions indicated
-    by the adduct and returns the resulting dictionary.
+    Apply adduct additions and subtractions to an element count dictionary.
+
+    Parameters
+    ----------
+    formula_dict : dict
+        Dictionary mapping element symbols to their counts in the base formula.
+    adduct : str
+        Adduct string specifying modifications, e.g. '[M+Na]+' or '[M-H]-'.
+
+    Returns
+    -------
+    dict or None
+        Updated element count dictionary after applying the adduct, or None if
+        any element count becomes negative (invalid formula).
     """
     updated_formula = formula_dict.copy()
 
@@ -165,8 +251,21 @@ def modify_formula_dict(formula_dict: dict, adduct: str) -> dict | None:
 
 def modify_charge(charge, adduct, adduct_db):
     """
-    Computes the net charge of a molecule based on its initial charge,
-    a database of adducts, and a specified adduct.
+    Compute the net charge of a molecule after applying an adduct.
+
+    Parameters
+    ----------
+    charge : int
+        Initial charge of the molecule.
+    adduct : str
+        Adduct ion name to look up in the database.
+    adduct_db : pd.DataFrame
+        DataFrame containing adduct definitions with 'Ion name' and 'Charge' columns.
+
+    Returns
+    -------
+    int
+        Net charge after applying the adduct.
     """
     adduct_info = adduct_db[adduct_db["Ion name"] == adduct]
     return adduct_info["Charge"].values[0] + charge
@@ -174,10 +273,22 @@ def modify_charge(charge, adduct, adduct_db):
 
 def get_decoy_info(decoy: str) -> tuple[str, int, int]:
     """
-    Extracts and returns the element, multiple, and sign in the form of +1, -1
-    (indicating addition or subtraction) from a decoy string.
+    Extract element, multiplier, and sign from a decoy string.
 
-    :raises ValueError: if decoy string doesn't follow '[+/-][d][Element]'.
+    Parameters
+    ----------
+    decoy : str
+        Decoy string in the format '[+/-][n][Element]', e.g. '+2C' or '-H'.
+
+    Returns
+    -------
+    tuple[str, int, int]
+        Tuple of (element_symbol, multiplier, sign), where sign is +1 or -1.
+
+    Raises
+    ------
+    ValueError
+        If the decoy string does not follow '[+/-][n][Element]' format.
     """
     decoy_matches = re.match(r"([+-])(\d+)?(.*)", decoy)
 
@@ -192,11 +303,39 @@ def get_decoy_info(decoy: str) -> tuple[str, int, int]:
 
 
 def get_adducts(header: Sequence):
-    """Extracts vaild adduct strings from a list."""
+    """
+    Extract valid adduct strings from a list of column headers.
+
+    Parameters
+    ----------
+    header : Sequence
+        List of strings to filter, typically column names from a DataFrame.
+
+    Returns
+    -------
+    list[str]
+        List of strings that match the adduct pattern (e.g. '[M+H]+').
+    """
     return [item for item in header if re.match("^[M[+-].*](\d+)?[+-]", item)]
 
 
 def normalize_scores(dist, dist_range):
+    """
+    Normalize a distance or score value to the [0, 1] range.
+
+    Parameters
+    ----------
+    dist : float
+        Raw distance or score value.
+    dist_range : list[float] or None
+        Expected range [min, max] of the score. Use [0, np.inf] for strictly non-negative
+        distances, [-np.inf, 0] for non-positive, or None to default to [0, 1].
+
+    Returns
+    -------
+    float
+        Normalized score clipped to [0, 1].
+    """
     if dist_range is None:
         dist_range = [0, 1]
 
@@ -217,8 +356,19 @@ def normalize_scores(dist, dist_range):
 
 def remove_noise(spectra: np.ndarray | list, noise: float | None) -> np.ndarray:
     """
-    Given a spectrum and a noise threshold, sets all intensity values
-    below (noise threshold x maximum intensity) to 0.
+    Zero out intensities below a relative noise threshold.
+
+    Parameters
+    ----------
+    spectra : np.ndarray or list
+        2D array of shape (n, 2) with columns [m/z, intensity].
+    noise : float or None
+        Fraction of the maximum intensity below which values are set to zero.
+
+    Returns
+    -------
+    np.ndarray
+        Spectrum array with sub-threshold intensities replaced by zero.
     """
     spectra = np.array(spectra)
     intensities = np.where(spectra[:, 1] >= np.max(spectra[:, 1]) * noise, spectra[:, 1], 0)
@@ -227,8 +377,17 @@ def remove_noise(spectra: np.ndarray | list, noise: float | None) -> np.ndarray:
 
 def normalize_intensity(spectrum: np.ndarray) -> np.ndarray:
     """
-    Normalize the intensities in a 2D array of m/z and intensity pairs using
-    total sum normalization, such that the sum of all intensity values equals 1.
+    Normalize spectrum intensities using total-sum normalization.
+
+    Parameters
+    ----------
+    spectrum : np.ndarray
+        2D array of shape (n, 2) with columns [m/z, intensity].
+
+    Returns
+    -------
+    np.ndarray
+        Spectrum with intensities rescaled so that they sum to 1.
     """
 
     if len(spectrum) > 0 and (_sum := np.sum(spectrum[:, 1])) > 0:
@@ -238,8 +397,23 @@ def normalize_intensity(spectrum: np.ndarray) -> np.ndarray:
 
 def str_to_dict(formula: str) -> dict:
     """
-    Given a chemical formula in string format, this methodr returns
-    a dictionary mapping elements to respective amounts.
+    Parse a chemical formula string into a dictionary of element counts.
+
+    Parameters
+    ----------
+    formula : str
+        Chemical formula string, optionally including a charge suffix,
+        e.g. 'C6H12O6' or 'H2O+'.
+
+    Returns
+    -------
+    dict[str, int]
+        Dictionary mapping element symbols (or isotope-prefixed symbols) to their counts.
+
+    Raises
+    ------
+    ValueError
+        If the formula contains invalid characters or no valid elements are found.
     """
     formula = re.sub(r"[+-](\d+)?$", "", formula)
     pattern = r"(\[\d+\])?([A-Z][a-z]?)(\d*)"
@@ -276,8 +450,18 @@ def str_to_dict(formula: str) -> dict:
 
 def get_charge(formula: str) -> int:
     """
-    Given a chemical formula in string format, this method
-    parses and returns its ionic charge.
+    Parse the ionic charge from a chemical formula string.
+
+    Parameters
+    ----------
+    formula : str
+        Chemical formula string with an optional trailing charge suffix,
+        e.g. 'C6H12O6+2' or 'H2O-'.
+
+    Returns
+    -------
+    int
+        Ionic charge. Returns 0 if no charge suffix is present.
     """
     pattern = re.compile(r"([+-])(\d*)$")
     match = pattern.search(formula)
@@ -293,8 +477,19 @@ def get_charge(formula: str) -> int:
 
 def get_formula(element_count: dict[str, int], charge: int):
     """
-    Construct a chemical formula string from element counts
-    and ionic charge.
+    Construct a chemical formula string from element counts and ionic charge.
+
+    Parameters
+    ----------
+    element_count : dict[str, int]
+        Dictionary mapping element symbols to their counts.
+    charge : int
+        Ionic charge of the compound. Use 0 for neutral compounds.
+
+    Returns
+    -------
+    str
+        Chemical formula string, e.g. 'C6H12O6' or 'C2H4O2+2'.
     """
     formula = "".join(f"{k}{'' if v == 1 else v}" for k, v in element_count.items())
     if charge:

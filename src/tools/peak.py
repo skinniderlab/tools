@@ -7,7 +7,19 @@ import logging
 
 
 class Peaks:
+    """A collection of chromatographic peaks parsed from a peak list file."""
+
     def __init__(self, filepath, isotope_filepath: str = None):
+        """
+        Initialize from a peak list file.
+
+        Parameters
+        ----------
+        filepath : str or Path
+            Path to the CSV peak list file containing m/z and retention time values.
+        isotope_filepath : str or Path, optional
+            Path to an isotope database file. If None, the default database is used.
+        """
         self.isotope_db = IsotopeDB(isotope_filepath)
         self.peaks = self._process_peaks(filepath)
 
@@ -18,6 +30,24 @@ class Peaks:
         return iter(self.peaks.values())
 
     def __getitem__(self, item):
+        """
+        Retrieve a peak by its peak ID.
+
+        Parameters
+        ----------
+        item : int or str
+            Peak ID to look up.
+
+        Returns
+        -------
+        Peak
+            The matching Peak object.
+
+        Raises
+        ------
+        KeyError
+            If no peak with the given ID exists in the collection.
+        """
         if (query_peak := self.peaks.get(item, None)) is None:
             raise KeyError(f"Peak with peak id {item} is not present in the provided peaks file.")
 
@@ -28,6 +58,29 @@ class Peaks:
 
     @staticmethod
     def _read_and_validate(filepath):
+        """
+        Read and validate a peak list CSV, normalizing column names.
+
+        Accepts files with either 'mz'/'RT' or 'medMz'/'medRt' column naming conventions.
+        Auto-generates peak IDs from m/z and RT if not present, and ensures optional
+        metadata columns exist.
+
+        Parameters
+        ----------
+        filepath : str or Path
+            Path to the CSV peak list file.
+
+        Returns
+        -------
+        pd.DataFrame
+            Validated DataFrame with normalized columns: 'mz', 'rt', 'peak_id', and
+            optional columns 'formula', 'level', 'accession', 'annotation'.
+
+        Raises
+        ------
+        ValueError
+            If required m/z or retention time columns are missing, or if peak IDs are not unique.
+        """
         df = pd.read_csv(filepath)
 
         if "mz" in df.columns:
@@ -70,6 +123,19 @@ class Peaks:
         return df.replace({"Unknown": None, float("nan"): None})
 
     def _process_peaks(self, filepath):
+        """
+        Read, validate, and convert peak rows into Peak objects.
+
+        Parameters
+        ----------
+        filepath : str or Path
+            Path to the CSV peak list file.
+
+        Returns
+        -------
+        dict[str or int, Peak]
+            Dictionary mapping peak IDs to their corresponding Peak objects.
+        """
         df = self._read_and_validate(filepath)
 
         has_smiles = True if "true_SMILES" in df.columns else False
@@ -101,6 +167,8 @@ class Peaks:
 
 @dataclass(frozen=True)
 class Peak:
+    """A single chromatographic peak with optional compound annotation."""
+
     peak_id: int | str
     mz: float
     rt: float
