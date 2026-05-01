@@ -1,15 +1,17 @@
+import logging
+from collections.abc import Iterator
 from dataclasses import InitVar, dataclass, field
+from pathlib import Path
 
 import pandas as pd
 
 from tools import Compound, IsotopeDB
-import logging
 
 
 class Peaks:
     """A collection of chromatographic peaks parsed from a peak list file."""
 
-    def __init__(self, filepath, isotope_filepath: str = None):
+    def __init__(self, filepath: str | Path, isotope_filepath: str | Path | None = None):
         """
         Initialize from a peak list file.
 
@@ -23,13 +25,13 @@ class Peaks:
         self.isotope_db = IsotopeDB(isotope_filepath)
         self.peaks = self._process_peaks(filepath)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.peaks)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator["Peak"]:
         return iter(self.peaks.values())
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: int | str) -> "Peak":
         """
         Retrieve a peak by its peak ID.
 
@@ -53,11 +55,11 @@ class Peaks:
 
         return query_peak
 
-    def __contains__(self, item: int):
+    def __contains__(self, item: int | str) -> bool:
         return item in self.peaks or item in self.peaks.values()
 
     @staticmethod
-    def _read_and_validate(filepath):
+    def _read_and_validate(filepath: str | Path) -> pd.DataFrame:
         """
         Read and validate a peak list CSV, normalizing column names.
 
@@ -108,7 +110,7 @@ class Peaks:
 
         if len(df) != df.peak_id.nunique():
             raise ValueError(
-                f"Duplicate peak IDs found in the {filepath.name}. "
+                f"Duplicate peak IDs found in the {Path(filepath).name}. "
                 "Please ensure all peak IDs are unique."
             )
 
@@ -122,7 +124,7 @@ class Peaks:
 
         return df.replace({"Unknown": None, float("nan"): None})
 
-    def _process_peaks(self, filepath):
+    def _process_peaks(self, filepath: str | Path) -> "dict[int | str, Peak]":
         """
         Read, validate, and convert peak rows into Peak objects.
 

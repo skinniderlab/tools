@@ -53,7 +53,7 @@ class Database:
         self.isotope_db = isotope_db
         self.df = self._load_database(db_filepath, isotope_db)
 
-    def __getitem__(self, item: Compound | str):
+    def __getitem__(self, item: Compound | str) -> pd.DataFrame:
         """
         Retrieve database entries for a given compound.
 
@@ -78,7 +78,7 @@ class Database:
 
         raise KeyError(f"{item} not found")
 
-    def __contains__(self, item: Compound | str):
+    def __contains__(self, item: Compound | str) -> bool:
         """
         Check whether a compound is present in the database.
 
@@ -99,7 +99,7 @@ class Database:
         return True
 
     @staticmethod
-    def _load_database(db_filepath: Path, isotope_db: IsotopeDB) -> pd.DataFrame:
+    def _load_database(db_filepath: Path, isotope_db: IsotopeDB) -> dict[Compound, pd.DataFrame]:
         """
         Loads the database from the specified filepath and parses element counts based on the
         presence of individual elements in the isotope database. The parsed data is then stored
@@ -168,7 +168,7 @@ class Database:
         """
         df = pd.concat([v for v in self.df.values()]).reset_index(drop=True)
 
-        def _compute_adduct_mass_to_charge(row: pd.Series, adduct: str) -> tuple | None:
+        def _compute_adduct_mass_to_charge(row: pd.Series, adduct: str) -> float | None:
             """
             Compute the mass-to-charge ratio (m/z) of adduct ions based on the
             information from the adducts database.
@@ -193,9 +193,9 @@ class Database:
             # Positively charged molecules, on the other hand, are only
             # considered for forming adducts with neutral atoms.
             if (ion_charge > 0 or ion_charge < 0) and row["charge"] == 0:
-                return (updated_mass).iloc[0]
+                return float((updated_mass).iloc[0])
             if ion_charge == 0 and row["charge"] > 0:
-                return (updated_mass).iloc[0] / row["charge"]
+                return float((updated_mass).iloc[0] / row["charge"])
 
             return None
 
@@ -240,7 +240,7 @@ class Database:
             """
             decoy_mass = self.isotope_db.get_mass_update(row["decoy_mode"])
             _adduct_info = self.adducts_db[self.adducts_db["Ion name"] == adduct]
-            return decoy_mass / abs(row["charge"] + _adduct_info["Charge"].values[0])
+            return float(decoy_mass / abs(row["charge"] + _adduct_info["Charge"].values[0]))
 
         random_mode_indices = np.random.randint(0, len(modes), len(df))
         decoy_df["decoy_mode"] = [modes[i] for i in random_mode_indices]

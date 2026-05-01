@@ -1,9 +1,11 @@
 import gzip
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import pandas as pd
 
 
 def get_file_delimiter(filepath: Path) -> str:
@@ -32,7 +34,7 @@ def get_file_delimiter(filepath: Path) -> str:
     return sep
 
 
-def get_file_info(filepath: Path) -> dict:
+def get_file_info(filepath: Path) -> dict[str, Any]:
     """
     Load metadata from a delimited file containing m/z and/or intensity data.
 
@@ -48,7 +50,7 @@ def get_file_info(filepath: Path) -> dict:
         and 'has_header'.
     """
 
-    def _get_open_method(_filepath: Path):
+    def _get_open_method(_filepath: Path) -> tuple[Callable[..., Any], str]:
         return (gzip.open, "rt") if _filepath.suffix == ".gz" else (open, "r")
 
     delim = get_file_delimiter(filepath)
@@ -93,7 +95,9 @@ def get_ppm_range(
     return lower_bound, upper_bound
 
 
-def calculate_ppm_error(observed_mz, theoretical_mz):
+def calculate_ppm_error(
+    observed_mz: float | np.ndarray, theoretical_mz: float | np.ndarray
+) -> float | np.ndarray:
     """
     Calculate the absolute ppm error between observed and theoretical m/z values.
 
@@ -112,7 +116,7 @@ def calculate_ppm_error(observed_mz, theoretical_mz):
     return np.abs((observed_mz - theoretical_mz) / theoretical_mz) * 1e6
 
 
-def aggregate_dict_values(dict1, dict2):
+def aggregate_dict_values(dict1: dict[str, int], dict2: dict[str, int]) -> dict[str, int]:
     """
     Merge two dictionaries by summing values for matching keys.
 
@@ -135,7 +139,7 @@ def aggregate_dict_values(dict1, dict2):
     return dict2
 
 
-def get_element_count(formula: str) -> dict:
+def get_element_count(formula: str) -> dict[str, int]:
     """
     Parse a chemical formula string into a dictionary of element counts.
 
@@ -171,7 +175,7 @@ def get_element_count(formula: str) -> dict:
         "IsoProp": "CH3CHOHCH3",
     }
 
-    def _get_element_count(element, multiplier=1):
+    def _get_element_count(element: str, multiplier: int = 1) -> dict[str, int]:
         """
         Given a chemical element (e.g., "H2", "O", "C12")
         with an optional count and a multiplier, return
@@ -212,7 +216,7 @@ def get_element_count(formula: str) -> dict:
     return element_count
 
 
-def modify_formula_dict(formula_dict: dict, adduct: str) -> dict | None:
+def modify_formula_dict(formula_dict: dict[str, int], adduct: str) -> dict[str, int] | None:
     """
     Apply adduct additions and subtractions to an element count dictionary.
 
@@ -249,7 +253,7 @@ def modify_formula_dict(formula_dict: dict, adduct: str) -> dict | None:
     return updated_formula
 
 
-def modify_charge(charge, adduct, adduct_db):
+def modify_charge(charge: int, adduct: str, adduct_db: pd.DataFrame) -> int:
     """
     Compute the net charge of a molecule after applying an adduct.
 
@@ -268,7 +272,7 @@ def modify_charge(charge, adduct, adduct_db):
         Net charge after applying the adduct.
     """
     adduct_info = adduct_db[adduct_db["Ion name"] == adduct]
-    return adduct_info["Charge"].values[0] + charge
+    return int(adduct_info["Charge"].values[0]) + charge
 
 
 def get_decoy_info(decoy: str) -> tuple[str, int, int]:
@@ -302,7 +306,7 @@ def get_decoy_info(decoy: str) -> tuple[str, int, int]:
     )
 
 
-def get_adducts(header: Sequence):
+def get_adducts(header: Sequence[str]) -> list[str]:
     """
     Extract valid adduct strings from a list of column headers.
 
@@ -319,7 +323,7 @@ def get_adducts(header: Sequence):
     return [item for item in header if re.match("^[M[+-].*](\d+)?[+-]", item)]
 
 
-def normalize_scores(dist, dist_range):
+def normalize_scores(dist: float, dist_range: list[float] | None) -> float:
     """
     Normalize a distance or score value to the [0, 1] range.
 
@@ -395,7 +399,7 @@ def normalize_intensity(spectrum: np.ndarray) -> np.ndarray:
     return spectrum
 
 
-def str_to_dict(formula: str) -> dict:
+def str_to_dict(formula: str) -> dict[str, int]:
     """
     Parse a chemical formula string into a dictionary of element counts.
 
@@ -418,7 +422,7 @@ def str_to_dict(formula: str) -> dict:
     formula = re.sub(r"[+-](\d+)?$", "", formula)
     pattern = r"(\[\d+\])?([A-Z][a-z]?)(\d*)"
 
-    result = {}
+    result: dict[str, int] = {}
     position = 0
     for match in re.finditer(pattern, formula):
         # check for invalid characters
@@ -475,7 +479,7 @@ def get_charge(formula: str) -> int:
     return magnitude if sign == "+" else -magnitude
 
 
-def get_formula(element_count: dict[str, int], charge: int):
+def get_formula(element_count: dict[str, int], charge: int) -> str:
     """
     Construct a chemical formula string from element counts and ionic charge.
 

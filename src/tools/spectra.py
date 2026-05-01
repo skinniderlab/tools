@@ -1,12 +1,12 @@
-from pathlib import Path
-from typing import Literal
-
-import pymzml
-import pandas as pd
+from collections.abc import Iterator
 from dataclasses import dataclass
-import numpy.typing as npt
+from pathlib import Path
+from typing import Literal, Callable
 
 import numpy as np
+import numpy.typing as npt
+import pymzml
+import pandas as pd
 
 
 class Spectra:
@@ -14,7 +14,7 @@ class Spectra:
 
     VALID_RT_UNITS = {"seconds", "minute", "hour"}
 
-    CONVERSIONS = {
+    CONVERSIONS: dict[tuple[str, str], Callable[[float], float]] = {
         ("seconds", "minute"): lambda x: x / 60,
         ("seconds", "hour"): lambda x: x / 3600,
         ("minute", "seconds"): lambda x: x * 60,
@@ -32,16 +32,16 @@ class Spectra:
         filepaths : list[str or Path]
             Paths to mzML files to parse.
         """
-        self.rtime_unit = None
+        self.rtime_unit: str = "unknown"
         self.spectra = self._read_mzml_files(filepaths)
 
     def __len__(self) -> int:
         return len(self.spectra)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator["Spectrum"]:
         return iter(self.spectra)
 
-    def _configure_retention_time_unit(self, unit):
+    def _configure_retention_time_unit(self, unit: str) -> str:
         """
         Validate and return a retention time unit string.
 
@@ -67,7 +67,7 @@ class Spectra:
             )
         return unit
 
-    def _configure_retention_time(self, rtime, unit):
+    def _configure_retention_time(self, rtime: float, unit: str) -> float:
         """
         Convert a retention time value to the collection's established unit.
 
@@ -89,7 +89,7 @@ class Spectra:
         unit = self._configure_retention_time_unit(unit)
 
         # establish the target unit
-        if self.rtime_unit is None:
+        if self.rtime_unit == "unknown":
             self.rtime_unit = unit
             return float(rtime)
 
@@ -98,7 +98,7 @@ class Spectra:
 
         return self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
 
-    def _read_mzml_files(self, filepaths: list[str | Path]):
+    def _read_mzml_files(self, filepaths: list[str | Path]) -> "list[Spectrum]":
         """
         Parse mzML files and return a list of Spectrum objects.
 
@@ -112,12 +112,13 @@ class Spectra:
         list[Spectrum]
             Parsed spectra from all provided files.
         """
-        spectra = []
+        spectra: list[Spectrum] = []
         for file in filepaths:
             run = pymzml.run.Reader(file)
             for i, spec in enumerate(run):
                 rtime = self._configure_retention_time(spec.scan_time[0], spec.scan_time[1])
 
+                polarity: Literal[0, 1, -1]
                 try:
                     polarity = 0 if spec["negative scan"] else 1
                 except KeyError:

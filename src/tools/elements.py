@@ -1,7 +1,9 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import cached_property
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -10,12 +12,13 @@ from tools.utils import get_decoy_info, modify_formula_dict, str_to_dict, get_fo
 
 ELECTRON_MASS = 5.486e-4
 
+
 class IsotopeDB:
     """A list of elements from the isotopes database."""
 
     DATA_FILE = files("tools.data").joinpath("iso_list.csv")
 
-    def __init__(self, filepath: Path = None):
+    def __init__(self, filepath: Path | None = None):
         """
         Initialize a list of elements.
 
@@ -25,10 +28,10 @@ class IsotopeDB:
             Path to the isotope file.
 
         """
-        filepath = self.DATA_FILE if filepath is None else filepath
-        self.filename = filepath.stem
+        resolved: Path = Path(str(self.DATA_FILE)) if filepath is None else filepath
+        self.filename = resolved.stem
         self.elements: list[Element] = []
-        self._parse_file(filepath)
+        self._parse_file(resolved)
 
     def _parse_file(self, filepath: Path) -> None:
         """
@@ -50,7 +53,7 @@ class IsotopeDB:
             isotopes = {Isotope(row.isotope, row.mass, row.abundance) for _, row in df.iterrows()}
             self.elements.append(Element(symbol=str(elem), isotopes=isotopes))
 
-    def get_mass_update(self, element):
+    def get_mass_update(self, element: str) -> float:
         """
         Return the mass adjustment for a given decoy string.
 
@@ -71,9 +74,9 @@ class IsotopeDB:
         """
 
         element, multiple, sign = get_decoy_info(element)
-        return self[element].monoisotope.mass * multiple * sign
+        return float(self[element].monoisotope.mass * multiple * sign)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: "str | Isotope") -> "Element":
         """
         Retrieve an element by its string symbol or Isotope object.
 
@@ -98,7 +101,7 @@ class IsotopeDB:
 
         raise KeyError(f"Element {item} not present in the provided isotope file.")
 
-    def __contains__(self, item):
+    def __contains__(self, item: object) -> bool:
         return item in self.elements
 
 
@@ -107,7 +110,7 @@ class Compound:
 
     VALID_ELEMENTS = ("C", "H", "O", "N", "P", "S", "F", "Cl", "Br", "I")
 
-    def __init__(self, formula: dict, isotope_db: IsotopeDB, charge: int = 0):
+    def __init__(self, formula: dict[str, int], isotope_db: "IsotopeDB", charge: int = 0) -> None:
         """
         Initializes a compound.
 
@@ -127,8 +130,8 @@ class Compound:
         self.charge = charge
         self.element_count = self._order_elements(formula)
         self.formula: str = get_formula(self.element_count, self.charge)
-        self.monomass = 0
-        self.monoabund = 1
+        self.monomass: float = 0.0
+        self.monoabund: float = 1.0
         self.monoisos: list[Isotope] = []
         self.nonmonoisos: list[Isotope] = []
 
@@ -136,7 +139,7 @@ class Compound:
         self._parse_isotopes()
 
     @classmethod
-    def from_str(cls, formula: str, isotope_db: IsotopeDB):
+    def from_str(cls, formula: str, isotope_db: "IsotopeDB") -> "Compound":
         """
         Construct a Compound from a formula string.
 
@@ -155,29 +158,29 @@ class Compound:
         """
         return cls(str_to_dict(formula), isotope_db, get_charge(formula))
 
-    def __lt__(self, other):
+    def __lt__(self, other: "Compound") -> bool:
         return self.formula < other.formula
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.formula)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.formula
 
-    def __contains__(self, item):
+    def __contains__(self, item: object) -> bool:
         return item in self.element_count
 
-    def __iter__(self):
+    def __iter__(self) -> "Iterator[Element]":
         return iter(self.element_count)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Compound):
             return self.formula == other.formula
         if isinstance(other, str):
             return self.formula == other
         return False
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: "Element") -> int:
         return self.element_count[item]
 
     def _order_elements(self, formula: dict) -> dict["Element", int]:
@@ -206,7 +209,7 @@ class Compound:
         # Keys in self.dict are sorted in the order described by VALID_ELEMENTS tuple
         return {self.isotope_db[k]: v for k, v in (order | formula).items() if v != 0}
 
-    def _parse_isotopes(self):
+    def _parse_isotopes(self) -> None:
         """
         Stores both the most abundant and non-abundant isotopes for every element in a compound.
         """
@@ -214,7 +217,7 @@ class Compound:
             self.monoisos.append(elem.monoisotope)
             self.nonmonoisos.extend(elem.other_isotopes)
 
-    def _compute_mass_and_abundance(self):
+    def _compute_mass_and_abundance(self) -> None:
         """
         Stores monoisotopic mass and abundance of the compound.
         """
@@ -225,7 +228,7 @@ class Compound:
         if self.monomass == 0:
             raise Exception(f"Monoisotopic mass could not be calculated for {self}!")
 
-    def get_updated_compound(self, adduct):
+    def get_updated_compound(self, adduct: str) -> "Compound":
         """
         Given an adduct repressented as a string, returns a new `Compound` object
         after updating the element counts of the original compound by applying
@@ -240,7 +243,7 @@ class Compound:
         apply_charges: bool = True,
         get_details: bool = False,
         scale: str = "abs",
-    ) -> np.ndarray:
+    ) -> "np.ndarray | pd.DataFrame":
         """
         Calculate the theoretical isotopic distribution for a given chemical compound from
         its molecular formula, returning the expected masses and relative abundances.
@@ -288,7 +291,7 @@ class Compound:
             row.mass = row.mass - monoiso.mass + nonmono.mass
 
             mono_proportion = row[monoiso] / monoiso.abundance
-            row.abundance *= (nonmono.abundance / (row[nonmono] + 1) * mono_proportion)
+            row.abundance *= nonmono.abundance / (row[nonmono] + 1) * mono_proportion
 
             row[monoiso] -= 1
             row[nonmono] += 1
@@ -343,7 +346,6 @@ class Compound:
         if self.charge != 0 and apply_charges:
             peaks["mass"] = (peaks["mass"] - ELECTRON_MASS * self.charge) / abs(self.charge)
 
-
         if scale == "rel":
             peaks["abundance"] = peaks.abundance.pipe(
                 lambda x: 100 * (x - x.min()) / (x.max() - x.min())
@@ -351,7 +353,6 @@ class Compound:
             peaks = peaks.sort_values("abundance", ascending=False).reset_index(drop=True)
         else:
             peaks = peaks.sort_values("mass").reset_index(drop=True)
-
 
         peaks.columns = peaks.columns.astype(str)
         if get_details:
@@ -368,22 +369,24 @@ class Isotope:
     mass: float
     abundance: float
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.symbol
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.symbol, self.mass, self.abundance))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, str):
             return self.symbol == other
-        return (
-            self.abundance == other.abundance
-            and self.symbol == other.symbol
-            and self.mass == other.mass
-        )
+        if isinstance(other, Isotope):
+            return (
+                self.abundance == other.abundance
+                and self.symbol == other.symbol
+                and self.mass == other.mass
+            )
+        return False
 
-    def __lt__(self, other):
+    def __lt__(self, other: "Isotope") -> bool:
         return self.abundance < other.abundance
 
 
@@ -394,21 +397,23 @@ class Element:
     symbol: str
     isotopes: set[Isotope]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.symbol
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.symbol)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, str):
             return self.symbol == other
-        return self.symbol == other.symbol and self.isotopes == other.isotopes
+        if isinstance(other, Element):
+            return self.symbol == other.symbol and self.isotopes == other.isotopes
+        return False
 
-    def __contains__(self, item):
+    def __contains__(self, item: object) -> bool:
         return any(item == isotope for isotope in self.isotopes)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str) -> "Isotope":
         """
         Retrieve an isotope of this element by its symbol.
 
@@ -434,21 +439,21 @@ class Element:
         raise KeyError(f"Isotope {item} not present in the provided isotope file.")
 
     @property
-    def n_isotopes(self):
+    def n_isotopes(self) -> int:
         """Returns the number of isotopes of an element."""
         return len(self.isotopes)
 
     @cached_property
-    def monoisotope(self):
+    def monoisotope(self) -> "Isotope":
         """Returns the most abundant isotope of an element."""
         return sorted(self.isotopes)[-1]
 
     @cached_property
-    def other_isotopes(self):
+    def other_isotopes(self) -> "list[Isotope]":
         """Returns all but the most abundant isotope of an element."""
         return sorted(self.isotopes)[:-1]
 
     @cached_property
-    def _isotope_lookup(self):
+    def _isotope_lookup(self) -> "dict[str, Isotope]":
         # O(1) lookup by symbol
         return {iso.symbol: iso for iso in self.isotopes}
