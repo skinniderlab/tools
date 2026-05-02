@@ -21,6 +21,12 @@ def isotope_db(data_dir):
 
 
 @pytest.fixture
+def isotope_db_nist(data_dir):
+    """IsotopeDB instance initialized with test data for validating class methods."""
+    return IsotopeDB(filepath=data_dir / "iso_list_nist.csv")
+
+
+@pytest.fixture
 def peaks(data_dir):
     """Peaks instance initialized with test data for validating class methods."""
     return Peaks(filepath=data_dir / "peaks.csv", isotope_filepath=data_dir / "iso_list.csv")

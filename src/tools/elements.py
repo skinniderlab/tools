@@ -358,7 +358,7 @@ class Compound:
         if get_details:
             return peaks.loc[:, ~peaks.columns.isin(["generation", "stop", "noniso"])]
 
-        return peaks[["mass", "abundance"]].values
+        return np.array(peaks[["mass", "abundance"]].values, dtype=object)
 
 
 @dataclass(frozen=True)

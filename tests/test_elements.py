@@ -1,3 +1,9 @@
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
 from tools import Compound, Element, Isotope
 
 
@@ -258,3 +264,23 @@ def test_compound_from_str(isotope_db):
     for formula, expected in formulas_to_convert.items():
         result = Compound.from_str(formula, isotope_db)
         assert result == expected, f"Expected {expected}, got {result}."
+
+
+@pytest.mark.parametrize("formula_str", ["C6H12O6", "C8H10N4O2", "C12H22O11", "C9H8O4", "C27H46O"])
+def test_isopattern_abs(data_dir, isotope_db_nist, formula_str):
+    """Compare isopattern output against reference CSVs generated with enviPat (R)."""
+    ref = pd.read_csv(data_dir / f"{formula_str}_isopattern_abs.csv", index_col=0)
+
+    compound = Compound.from_str(formula_str, isotope_db_nist)
+    # abundance_limit mirrors enviPat's 0.01% threshold relative to the base peak
+    result = compound.isopattern(
+        abundance_limit=1e-4 * compound.monoabund,
+        max_iter=100,
+        apply_charges=False,
+    )
+
+    result = result[np.argsort(result[:, 1])[::-1]][:len(ref)]
+    ref = ref.sort_values(by=["abundance"], ascending=False)
+
+    assert np.allclose(result[:, 0], ref["m/z"].values, rtol=1e-6)
+    assert np.allclose(result[:, 1], ref["abundance"].values, rtol=1e-6)
