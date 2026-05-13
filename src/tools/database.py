@@ -240,7 +240,10 @@ class Database:
             """
             decoy_mass = self.isotope_db.get_mass_update(row["decoy_mode"])
             _adduct_info = self.adducts_db[self.adducts_db["Ion name"] == adduct]
-            return float(decoy_mass / abs(row["charge"] + _adduct_info["Charge"].values[0]))
+            charge = abs(row["charge"] + _adduct_info["Charge"].values[0])
+            if charge == 0:
+                return 0.0
+            return float(decoy_mass / charge)
 
         random_mode_indices = np.random.randint(0, len(modes), len(df))
         decoy_df["decoy_mode"] = [modes[i] for i in random_mode_indices]
