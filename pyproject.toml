@@ -44,7 +44,7 @@ tools = ["data/*.csv"]
 testpaths = ["tests"]
 addopts = "-sv"
 minversion = 8.3
-
+filterwarnings = ["ignore::DeprecationWarning:pymzml"]
 
 [project.optional-dependencies]
 dev = ["pytest", "mypy"]
