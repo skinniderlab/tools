@@ -1,8 +1,9 @@
+import warnings
 from pathlib import Path
 
 import numpy as np
 import pytest
-import warnings
+
 from tools import Database, IsotopeDB, Peaks, Spectra
 
 np.set_printoptions(legacy="1.25")

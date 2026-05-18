@@ -70,52 +70,6 @@ def get_file_info(filepath: Path) -> dict[str, Any]:
     }
 
 
-def get_ppm_range(
-    lower_bound: np.ndarray, upper_bound: np.ndarray, ppm_error: float
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Expand an m/z range by a given ppm tolerance.
-
-    Parameters
-    ----------
-    lower_bound : np.ndarray
-        Lower m/z boundary values.
-    upper_bound : np.ndarray
-        Upper m/z boundary values.
-    ppm_error : float
-        Parts-per-million tolerance to apply.
-
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray]
-        Updated (lower_bound, upper_bound) after applying the ppm expansion.
-    """
-    lower_bound += -ppm_error / 1e6 * lower_bound
-    upper_bound += ppm_error / 1e6 * upper_bound
-    return lower_bound, upper_bound
-
-
-def calculate_ppm_error(
-    observed_mz: float | np.ndarray, theoretical_mz: float | np.ndarray
-) -> float | np.ndarray:
-    """
-    Calculate the absolute ppm error between observed and theoretical m/z values.
-
-    Parameters
-    ----------
-    observed_mz : float or np.ndarray
-        Observed m/z value(s).
-    theoretical_mz : float or np.ndarray
-        Theoretical m/z value(s).
-
-    Returns
-    -------
-    float or np.ndarray
-        Absolute ppm error(s).
-    """
-    return np.abs((observed_mz - theoretical_mz) / theoretical_mz) * 1e6
-
-
 def aggregate_dict_values(dict1: dict[str, int], dict2: dict[str, int]) -> dict[str, int]:
     """
     Merge two dictionaries by summing values for matching keys.
