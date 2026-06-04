@@ -1,3 +1,5 @@
+import gzip
+
 import numpy as np
 
 from tools.utils import (
@@ -6,6 +8,7 @@ from tools.utils import (
     get_decoy_info,
     get_element_count,
     get_file_delimiter,
+    get_file_info,
     get_formula,
     modify_charge,
     modify_formula_dict,
@@ -27,6 +30,39 @@ def test_get_file_delimiter(data_dir):
     for filepath, expected_delimiter in filepath_to_delimiter.items():
         delimiter = get_file_delimiter(data_dir / filepath)
         assert delimiter == expected_delimiter
+
+
+def test_get_file_info(data_dir, tmp_path):
+    """
+    Checks whether `get_file_info` returns accurate metadata for plain and
+    gzip-compressed delimited files, including delimiter, open function, mode,
+    row count, column count, and whether 'mz' appears as a column header.
+    """
+    result = get_file_info(data_dir / "iso_list.csv")
+    assert result["delim"] == ","
+    assert result["open_fn"] is open
+    assert result["mode"] == "r"
+    assert result["n_rows"] == 296
+    assert result["n_columns"] == 4
+    assert result["has_header"] is False
+
+    result = get_file_info(data_dir / "formula-database-truncated.tsv.gz")
+    assert result["delim"] == "\t"
+    assert result["open_fn"] is gzip.open
+    assert result["mode"] == "rt"
+    assert result["n_rows"] == 2000
+    assert result["n_columns"] == 15
+    assert result["has_header"] is False
+
+    mz_csv = tmp_path / "mz_data.csv"
+    mz_csv.write_text("mz,intensity\n100.0,0.5\n200.0,1.0\n")
+    result = get_file_info(mz_csv)
+    assert result["delim"] == ","
+    assert result["open_fn"] is open
+    assert result["mode"] == "r"
+    assert result["n_rows"] == 3
+    assert result["n_columns"] == 2
+    assert result["has_header"] is True
 
 
 def test_modify_formula_dict():
