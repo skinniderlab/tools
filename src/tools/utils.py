@@ -401,3 +401,12 @@ def get_formula(element_count: dict[str, int], charge: int) -> str:
         formula += sign + magnitude
 
     return formula
+
+
+def get_ppm_range(mz, ppm_error=0, abs_tol=0):
+    lower_bound = mz - ppm_error / 1e6 * mz
+    upper_bound = mz + ppm_error / 1e6 * mz
+    if abs_tol != 0:
+        lower_bound += -abs_tol
+        upper_bound += abs_tol
+    return lower_bound, upper_bound
