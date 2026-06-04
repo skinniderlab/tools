@@ -1,7 +1,24 @@
+from pathlib import Path
+
+import numpy as np
 import pytest
 
 from tools import Spectra
 from tools.spectra import Spectrum
+
+
+def _make_spectrum(mz, intensity):
+    return Spectrum(
+        spectrum_index=0,
+        ms_level=2,
+        rtime=1.0,
+        scan_index=1,
+        file=Path("test.mzML"),
+        mz=np.array(mz, dtype=np.float64),
+        intensity=np.array(intensity, dtype=np.float64),
+        polarity=1,
+        rtime_unit="minute",
+    )
 
 
 def test_spectra_len(data_dir, spectra):
@@ -70,3 +87,100 @@ def test_configure_retention_time_minute_to_hour():
     s._configure_retention_time(0.0, "hour")
     result = s._configure_retention_time(60.0, "minute")
     assert result == pytest.approx(1.0)
+
+
+def test_match_peaks_all_matched():
+    """
+    All self peaks have a counterpart in other_spectrum within the ppm window.
+    No unmatched rows should appear on either side.
+    """
+    spec = _make_spectrum(mz=[100.0, 200.0], intensity=[0.5, 0.8])
+    other = np.array([[100.0005, 0.6], [200.001, 0.9]])  # both within 20 ppm
+
+    matches = spec._match_peaks(other, ppm_error=20)
+
+    expected = np.array([
+        [100.0, 0.5, 100.0005, 0.6],
+        [200.0, 0.8, 200.001, 0.9],
+    ])
+    assert matches.shape == (2, 4)
+    assert np.allclose(matches, expected)
+
+
+def test_match_peaks_partial_match():
+    spec = _make_spectrum(mz=[100.0, 200.0, 300.0], intensity=[0.5, 0.8, 0.3])
+    other = np.array([[100.0, 0.6], [500.0, 0.7]])
+
+    matches = spec._match_peaks(other, ppm_error=10)
+
+    expected = np.array([
+        [100.0, 0.5, 100.0, 0.6],
+        [200.0, 0.8, 0.0, 0.0],
+        [300.0, 0.3, 0.0, 0.0],
+        [0.0, 0.0, 500.0, 0.7],
+    ])
+    assert matches.shape == (4, 4)
+    assert np.allclose(matches, expected)
+
+
+def test_match_peaks_no_match():
+    spec = _make_spectrum(mz=[100.0], intensity=[0.5])
+    other = np.array([[300.0, 0.8]])
+
+    matches = spec._match_peaks(other, ppm_error=10)
+
+    expected = np.array([
+        [100.0, 0.5, 0.0, 0.0],
+        [0.0, 0.0, 300.0, 0.8],
+    ])
+    assert matches.shape == (2, 4)
+    assert np.allclose(matches, expected)
+
+
+def test_match_peaks_closest_chosen():
+    spec = _make_spectrum(mz=[100.0], intensity=[0.5])
+    other = np.array([[99.999, 0.4], [100.0005, 0.6]])
+
+    matches = spec._match_peaks(other, ppm_error=20)
+
+    # 99.999 is closer to 100.0 than 100.0005
+    expected = np.array([
+        [100.0, 0.5, 100.0005, 0.6],
+        [0.0, 0.0, 99.999, 0.4],
+    ])
+    assert matches.shape == (2, 4)
+    assert np.allclose(matches, expected)
+
+
+def test_match_peaks_abs_tol():
+    spec = _make_spectrum(mz=[100.0], intensity=[0.5])
+    other = np.array([[100.005, 0.6]])
+
+    without_abs_tol = spec._match_peaks(other, ppm_error=10, abs_tol=0)
+    with_abs_tol = spec._match_peaks(other, ppm_error=10, abs_tol=0.005)
+
+    assert np.allclose(without_abs_tol, [[100.0, 0.5, 0.0, 0.0], [0.0, 0.0, 100.005, 0.6]])
+    assert np.allclose(with_abs_tol, [[100.0, 0.5, 100.005, 0.6]])
+
+
+
+def test_compare_spectra_empty_other():
+    spec = _make_spectrum(mz=[100.0], intensity=[0.5])
+    result = spec.compare_spectra(np.empty((0, 2)), ppm_error=10, function=np.dot)
+    assert result == 0.0
+
+
+def test_compare_spectra_matched_peaks():
+    spec = _make_spectrum(mz=[100.0, 200.0], intensity=[0.5, 0.8])
+    other = np.array([[100.0, 0.6], [200.0, 0.9]])
+
+    result = spec.compare_spectra(other, ppm_error=10, function=np.dot)
+    assert result == pytest.approx(1.02)
+
+
+def test_compare_spectra_no_match():
+    spec = _make_spectrum(mz=[100.0], intensity=[0.5])
+    other = np.array([[300.0, 0.8]])
+
+    result = spec.compare_spectra(other, ppm_error=10, function=np.dot)
+    assert result == pytest.approx(0.0)

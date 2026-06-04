@@ -6,6 +6,7 @@ from typing import Literal
 import numpy as np
 import numpy.typing as npt
 import pymzml
+from tools.utils import get_ppm_range
 
 
 class Spectra:
@@ -152,3 +153,67 @@ class Spectrum:
     intensity: npt.NDArray[np.float64]
     polarity: Literal[0, 1, -1]
     rtime_unit: str
+
+    def _match_peaks(
+        self, other_spectrum: npt.NDArray[np.float64], ppm_error: float, abs_tol: float = 0
+    ) -> npt.NDArray[np.float64]:
+        """
+        Match peaks from this spectrum against ``exp`` within a ppm tolerance.
+
+        Each unmatched peak from ``self`` contributes a row with zero exp values;
+        each unmatched peak from ``exp`` contributes a row with zero self values.
+
+        Returns an (n, 4) array with columns [self_mz, self_int, exp_mz, exp_int].
+        """
+        spec1 = np.column_stack([self.mz, self.intensity])
+        spec1 = spec1[np.argsort(spec1[:, 0])]
+        spec2 = other_spectrum[np.argsort(other_spectrum[:, 0])]
+        matches = []
+
+        for i, spec in enumerate(spec1):
+            lower_bound, upper_bound = get_ppm_range(spec[0], ppm_error, abs_tol)
+            mask = (spec2[:, 0] >= lower_bound) & (spec2[:, 0] <= upper_bound)
+            if sum(mask) > 0:
+                matches.append(
+                    np.hstack([spec, spec2[mask][np.argsort(np.abs(spec2[mask, 0] - spec[0]))[0]]])
+                )
+            else:
+                matches.append(np.r_[spec, [0, 0]])
+
+        matches = np.array(matches)
+        for spec in other_spectrum:
+            if spec[0] not in matches[:, 2]:
+                matches = np.vstack((matches, np.r_[[0, 0], spec]))
+
+        return matches
+
+    def compare_spectra(
+        self,
+        other_spectrum: npt.NDArray[np.float64],
+        ppm_error: float,
+        function: Callable[[npt.NDArray[np.float64], npt.NDArray[np.float64]], float],
+    ) -> float:
+        """
+        Score this spectrum against ``other_spectrum``.
+
+        Parameters
+        ----------
+        other_spectrum:
+            Array of shape ``(n, 2)`` with columns ``[mz, intensity]``.
+
+        ppm_error:
+            Mass tolerance in parts-per-million for peak matching.
+
+        function:
+            Scoring function applied to ``(self_intensities, other_intensities)``
+            extracted from matched peak rows.
+
+        Returns
+        -------
+        float
+            Score returned by ``function``, or 0 if ``other_spectrum`` is empty.
+        """
+        if other_spectrum.size == 0:
+            return 0.0
+        matches = self._match_peaks(other_spectrum, ppm_error)
+        return float(function(matches[:, 1], matches[:, 3]))

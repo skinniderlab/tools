@@ -166,7 +166,6 @@ class Peaks:
             )
         return peak_info
 
-
 @dataclass(frozen=True)
 class Peak:
     """A single chromatographic peak with optional compound annotation."""
