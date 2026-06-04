@@ -70,52 +70,6 @@ def get_file_info(filepath: Path) -> dict[str, Any]:
     }
 
 
-def get_ppm_range(
-    lower_bound: np.ndarray, upper_bound: np.ndarray, ppm_error: float
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Expand an m/z range by a given ppm tolerance.
-
-    Parameters
-    ----------
-    lower_bound : np.ndarray
-        Lower m/z boundary values.
-    upper_bound : np.ndarray
-        Upper m/z boundary values.
-    ppm_error : float
-        Parts-per-million tolerance to apply.
-
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray]
-        Updated (lower_bound, upper_bound) after applying the ppm expansion.
-    """
-    lower_bound += -ppm_error / 1e6 * lower_bound
-    upper_bound += ppm_error / 1e6 * upper_bound
-    return lower_bound, upper_bound
-
-
-def calculate_ppm_error(
-    observed_mz: float | np.ndarray, theoretical_mz: float | np.ndarray
-) -> float | np.ndarray:
-    """
-    Calculate the absolute ppm error between observed and theoretical m/z values.
-
-    Parameters
-    ----------
-    observed_mz : float or np.ndarray
-        Observed m/z value(s).
-    theoretical_mz : float or np.ndarray
-        Theoretical m/z value(s).
-
-    Returns
-    -------
-    float or np.ndarray
-        Absolute ppm error(s).
-    """
-    return np.abs((observed_mz - theoretical_mz) / theoretical_mz) * 1e6
-
-
 def aggregate_dict_values(dict1: dict[str, int], dict2: dict[str, int]) -> dict[str, int]:
     """
     Merge two dictionaries by summing values for matching keys.
@@ -323,41 +277,6 @@ def get_adducts(header: Sequence[str]) -> list[str]:
     return [item for item in header if re.match("^[M[+-].*](\d+)?[+-]", item)]
 
 
-def normalize_scores(dist: float, dist_range: list[float] | None) -> float:
-    """
-    Normalize a distance or score value to the [0, 1] range.
-
-    Parameters
-    ----------
-    dist : float
-        Raw distance or score value.
-    dist_range : list[float] or None
-        Expected range [min, max] of the score. Use [0, np.inf] for strictly non-negative
-        distances, [-np.inf, 0] for non-positive, or None to default to [0, 1].
-
-    Returns
-    -------
-    float
-        Normalized score clipped to [0, 1].
-    """
-    if dist_range is None:
-        dist_range = [0, 1]
-
-    if dist_range == [0, np.inf]:
-        result = dist / (1 + dist)
-    elif dist_range == [-np.inf, 0]:
-        result = 1 / (1 - dist)
-    else:
-        result = (dist - dist_range[0]) / (dist_range[1] - dist_range[0])
-
-    if result < 0:
-        result = 0
-    elif result > 1:
-        result = 1
-
-    return result
-
-
 def remove_noise(spectra: np.ndarray | list, noise: float | None) -> np.ndarray:
     """
     Zero out intensities below a relative noise threshold.
@@ -377,26 +296,6 @@ def remove_noise(spectra: np.ndarray | list, noise: float | None) -> np.ndarray:
     spectra = np.array(spectra)
     intensities = np.where(spectra[:, 1] >= np.max(spectra[:, 1]) * noise, spectra[:, 1], 0)
     return np.stack([spectra[:, 0], intensities], axis=1)
-
-
-def normalize_intensity(spectrum: np.ndarray) -> np.ndarray:
-    """
-    Normalize spectrum intensities using total-sum normalization.
-
-    Parameters
-    ----------
-    spectrum : np.ndarray
-        2D array of shape (n, 2) with columns [m/z, intensity].
-
-    Returns
-    -------
-    np.ndarray
-        Spectrum with intensities rescaled so that they sum to 1.
-    """
-
-    if len(spectrum) > 0 and (_sum := np.sum(spectrum[:, 1])) > 0:
-        spectrum[:, 1] = spectrum[:, 1] / _sum
-    return spectrum
 
 
 def str_to_dict(formula: str) -> dict[str, int]:

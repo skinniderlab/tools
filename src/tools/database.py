@@ -5,7 +5,6 @@ import pandas as pd
 
 from tools.elements import Compound, IsotopeDB
 from tools.utils import get_adducts, get_file_delimiter, modify_formula_dict
-import re
 
 
 class Database:

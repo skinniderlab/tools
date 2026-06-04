@@ -1,4 +1,4 @@
-from tools import Peak, Compound
+from tools import Compound, Peak
 
 
 def test_peaks_object(isotope_db, peaks):

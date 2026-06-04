@@ -1,12 +1,11 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Callable
+from typing import Literal
 
 import numpy as np
 import numpy.typing as npt
 import pymzml
-import pandas as pd
 
 
 class Spectra:

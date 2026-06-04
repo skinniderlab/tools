@@ -3,12 +3,11 @@ from dataclasses import dataclass
 from functools import cached_property
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from tools.utils import get_decoy_info, modify_formula_dict, str_to_dict, get_formula, get_charge
+from tools.utils import get_charge, get_decoy_info, get_formula, modify_formula_dict, str_to_dict
 
 ELECTRON_MASS = 5.486e-4
 
