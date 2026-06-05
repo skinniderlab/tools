@@ -37,7 +37,8 @@ class Spectra:
             Paths to mzML files to parse.
 
         rtime_unit : {'seconds', 'minute', 'hour'}
-            Rtime unit to use.
+            Target retention time unit. All parsed spectra are converted to
+            this unit. Defaults to 'seconds'.
         """
         self.rtime_unit: str = self._configure_retention_time_unit(rtime_unit)
         self.spectra = self._read_mzml_files(filepaths)
@@ -76,10 +77,7 @@ class Spectra:
 
     def _configure_retention_time(self, rtime: float, unit: str) -> float:
         """
-        Convert a retention time value to the collection's established unit.
-
-        Sets the collection's unit from the first spectrum encountered, then converts
-        all subsequent values to match.
+        Convert a retention time value to the collection's target unit.
 
         Parameters
         ----------
@@ -91,7 +89,7 @@ class Spectra:
         Returns
         -------
         float
-            Retention time converted to the collection's established unit.
+            Retention time converted to ``self.rtime_unit``.
         """
         unit = self._configure_retention_time_unit(unit)
 
