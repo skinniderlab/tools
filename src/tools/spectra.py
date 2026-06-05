@@ -96,9 +96,7 @@ class Spectra:
         if self.rtime_unit == unit:
             return float(rtime)
 
-        converted_value = self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
-        self.rtime_unit = unit
-        return converted_value
+        return self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
 
     def _read_mzml_files(self, filepaths: list[str | Path]) -> "list[Spectrum]":
         """

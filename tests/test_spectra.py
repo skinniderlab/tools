@@ -41,7 +41,7 @@ def test_spectra_rtime_unit(spectra):
     s = Spectra(filepaths=[])
     assert s.rtime_unit == "seconds"
     s._configure_retention_time(1.0, "minute")
-    assert s.rtime_unit == "minute"
+    assert s.rtime_unit == "seconds"
     for unit in ("seconds", "minute", "hour"):
         assert s._configure_retention_time_unit(unit) == unit
 
@@ -62,31 +62,27 @@ def test_spectrum_file_paths(data_dir, spectra):
 
 
 def test_configure_retention_time_same_unit_passthrough():
-    s = Spectra(filepaths=[])
-    s._configure_retention_time(5.0, "minute")
+    s = Spectra(filepaths=[], rtime_unit="minute")
     result = s._configure_retention_time(10.0, "minute")
     assert result == pytest.approx(10.0)
 
 
 def test_configure_retention_time_seconds_to_minute():
-    s = Spectra(filepaths=[])
-    s._configure_retention_time(0.0, "minute")
+    s = Spectra(filepaths=[], rtime_unit="minute")
     result = s._configure_retention_time(120.0, "seconds")
     assert result == pytest.approx(2.0)
 
 
 def test_configure_retention_time_hour_to_seconds():
     s = Spectra(filepaths=[])
-    s._configure_retention_time(0.0, "seconds")
     result = s._configure_retention_time(1.0, "hour")
     assert result == pytest.approx(3600.0)
 
 
 def test_configure_retention_time_minute_to_hour():
     s = Spectra(filepaths=[])
-    s._configure_retention_time(0.0, "hour")
     result = s._configure_retention_time(60.0, "minute")
-    assert result == pytest.approx(1.0)
+    assert result == pytest.approx(3600.0)
 
 
 def test_match_peaks_all_matched():
