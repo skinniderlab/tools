@@ -39,7 +39,7 @@ def test_spectra_rtime_unit(spectra):
     assert all(sp.rtime_unit == spectra.rtime_unit for sp in spectra)
 
     s = Spectra(filepaths=[])
-    assert s.rtime_unit == "unknown"
+    assert s.rtime_unit == "seconds"
     s._configure_retention_time(1.0, "minute")
     assert s.rtime_unit == "minute"
     for unit in ("seconds", "minute", "hour"):
@@ -51,12 +51,12 @@ def test_spectra_rtime_unit(spectra):
 
 def test_spectrum_file_paths(data_dir, spectra):
     expected_files = {
-        data_dir / "Blank1A.mzML",
-        data_dir / "GAS01.mzML",
-        data_dir / "GB01.mzML",
-        data_dir / "L01.mzML",
-        data_dir / "LB01.mzML",
-        data_dir / "T01A.mzML",
+        "Blank1A.mzML",
+        "GAS01.mzML",
+        "GB01.mzML",
+        "L01.mzML",
+        "LB01.mzML",
+        "T01A.mzML",
     }
     assert {sp.file for sp in spectra} == expected_files
 
@@ -99,10 +99,12 @@ def test_match_peaks_all_matched():
 
     matches = spec._match_peaks(other, ppm_error=20)
 
-    expected = np.array([
-        [100.0, 0.5, 100.0005, 0.6],
-        [200.0, 0.8, 200.001, 0.9],
-    ])
+    expected = np.array(
+        [
+            [100.0, 0.5, 100.0005, 0.6],
+            [200.0, 0.8, 200.001, 0.9],
+        ]
+    )
     assert matches.shape == (2, 4)
     assert np.allclose(matches, expected)
 
@@ -113,12 +115,14 @@ def test_match_peaks_partial_match():
 
     matches = spec._match_peaks(other, ppm_error=10)
 
-    expected = np.array([
-        [100.0, 0.5, 100.0, 0.6],
-        [200.0, 0.8, 0.0, 0.0],
-        [300.0, 0.3, 0.0, 0.0],
-        [0.0, 0.0, 500.0, 0.7],
-    ])
+    expected = np.array(
+        [
+            [100.0, 0.5, 100.0, 0.6],
+            [200.0, 0.8, 0.0, 0.0],
+            [300.0, 0.3, 0.0, 0.0],
+            [0.0, 0.0, 500.0, 0.7],
+        ]
+    )
     assert matches.shape == (4, 4)
     assert np.allclose(matches, expected)
 
@@ -129,10 +133,12 @@ def test_match_peaks_no_match():
 
     matches = spec._match_peaks(other, ppm_error=10)
 
-    expected = np.array([
-        [100.0, 0.5, 0.0, 0.0],
-        [0.0, 0.0, 300.0, 0.8],
-    ])
+    expected = np.array(
+        [
+            [100.0, 0.5, 0.0, 0.0],
+            [0.0, 0.0, 300.0, 0.8],
+        ]
+    )
     assert matches.shape == (2, 4)
     assert np.allclose(matches, expected)
 
@@ -144,10 +150,12 @@ def test_match_peaks_closest_chosen():
     matches = spec._match_peaks(other, ppm_error=20)
 
     # 99.999 is closer to 100.0 than 100.0005
-    expected = np.array([
-        [100.0, 0.5, 100.0005, 0.6],
-        [0.0, 0.0, 99.999, 0.4],
-    ])
+    expected = np.array(
+        [
+            [100.0, 0.5, 100.0005, 0.6],
+            [0.0, 0.0, 99.999, 0.4],
+        ]
+    )
     assert matches.shape == (2, 4)
     assert np.allclose(matches, expected)
 
@@ -161,7 +169,6 @@ def test_match_peaks_abs_tol():
 
     assert np.allclose(without_abs_tol, [[100.0, 0.5, 0.0, 0.0], [0.0, 0.0, 100.005, 0.6]])
     assert np.allclose(with_abs_tol, [[100.0, 0.5, 100.005, 0.6]])
-
 
 
 def test_compare_spectra_empty_other():

@@ -23,7 +23,11 @@ class Spectra:
         ("hour", "minute"): lambda x: x * 60,
     }
 
-    def __init__(self, filepaths: list[str | Path]):
+    def __init__(
+        self,
+        filepaths: list[str | Path],
+        rtime_unit: Literal["seconds", "minute", "hour"] = "seconds",
+    ):
         """
         Initialize from a list of mzML file paths.
 
@@ -31,8 +35,11 @@ class Spectra:
         ----------
         filepaths : list[str or Path]
             Paths to mzML files to parse.
+
+        rtime_unit : {'seconds', 'minute', 'hour'}
+            Rtime unit to use.
         """
-        self.rtime_unit: str = "unknown"
+        self.rtime_unit: str = self._configure_retention_time_unit(rtime_unit)
         self.spectra = self._read_mzml_files(filepaths)
 
     def __len__(self) -> int:
@@ -88,15 +95,12 @@ class Spectra:
         """
         unit = self._configure_retention_time_unit(unit)
 
-        # establish the target unit
-        if self.rtime_unit == "unknown":
-            self.rtime_unit = unit
-            return float(rtime)
-
         if self.rtime_unit == unit:
             return float(rtime)
 
-        return self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
+        converted_value = self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
+        self.rtime_unit = unit
+        return converted_value
 
     def _read_mzml_files(self, filepaths: list[str | Path]) -> "list[Spectrum]":
         """
@@ -130,7 +134,7 @@ class Spectra:
                         ms_level=spec.ms_level,
                         rtime=rtime,
                         scan_index=spec.ID,
-                        file=Path(run.path_or_file),
+                        file=Path(run.path_or_file).name,
                         mz=spec.mz,
                         intensity=spec.i,
                         polarity=polarity,
