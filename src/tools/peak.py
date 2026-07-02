@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, fields
 from pathlib import Path
 
@@ -210,7 +210,7 @@ class Peaks:
         """
         return Peak(**row._asdict())
 
-    def match_mz(self, mz: float, ppm_error: float) -> "list[Peak]":
+    def match_mz(self, mz: float, ppm_error: float) -> pd.DataFrame:
         """
         Match a single m/z value against the peaks in this collection.
 
@@ -226,12 +226,40 @@ class Peaks:
 
         Returns
         -------
-        list[Peak]
-            The matching Peak objects, empty when no peak matches.
+        pd.DataFrame
+            The subset of the peak DataFrame whose rows match, with the
+            collection's original index preserved. Empty when no peak matches.
         """
-        lower_bound, upper_bound = get_ppm_range(mz, ppm_error)
-        matches = self._df[(self._df["mz"] >= lower_bound) & (self._df["mz"] <= upper_bound)]
-        return [self._to_peak(row) for row in matches.itertuples(index=False)]
+        return self.match_mzs([mz], ppm_error)
+
+    def match_mzs(self, mzs: Iterable[float], ppm_error: float) -> pd.DataFrame:
+        """
+        Match a sequence of m/z values against the peaks in this collection.
+
+        Return the subset of peaks whose m/z falls within ``ppm_error``
+        parts-per-million of *any* of the query values. Each matching peak
+        appears once, even if it matches several query values, in the
+        collection's original order.
+
+        Parameters
+        ----------
+        mzs : Iterable[float]
+            m/z values to match against the collection's peaks.
+        ppm_error : float
+            Mass tolerance in parts-per-million used to define the match window.
+
+        Returns
+        -------
+        pd.DataFrame
+            The subset of the peak DataFrame (see :meth:`to_df`) whose rows match,
+            with the collection's original index preserved. Empty when nothing matches.
+        """
+        mask = pd.Series(False, index=self._df.index)
+        for mz in mzs:
+            lower_bound, upper_bound = get_ppm_range(mz, ppm_error)
+            mask |= self._df["mz"].between(lower_bound, upper_bound)
+
+        return self._df[mask].copy()
 
 
 @dataclass(frozen=True, slots=True)

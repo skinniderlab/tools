@@ -43,9 +43,22 @@ def test_peak_2(peaks_2, isotope_db):
 
 
 def test_mz(peaks):
-    assert [peak.peak_id for peak in peaks.match_mz(288.908623547669, ppm_error=5)] == [1]
-    assert 1 in [
-        peak.peak_id for peak in peaks.match_mz(288.908623547669 * (1 + 3 / 1e6), ppm_error=5)
-    ]
-    assert {3, 4}.issubset({peak.peak_id for peak in peaks.match_mz(360.934623547669, ppm_error=5)})
-    assert peaks.match_mz(1.0, ppm_error=5) == []
+    assert list(peaks.match_mz(288.908623547669, ppm_error=5)["peak_id"]) == [1]
+    assert 1 in set(peaks.match_mz(288.908623547669 * (1 + 3 / 1e6), ppm_error=5)["peak_id"])
+    assert {3, 4}.issubset(set(peaks.match_mz(360.934623547669, ppm_error=5)["peak_id"]))
+    assert peaks.match_mz(1.0, ppm_error=5).empty
+
+
+def test_mzs(peaks):
+    # union of matches across queries, each matching peak returned once
+    result = peaks.match_mzs([288.908623547669, 360.934623547669], ppm_error=5)
+    assert {1, 3, 4}.issubset(set(result["peak_id"]))
+
+    # a peak matched by two nearby queries appears only once
+    deduped = peaks.match_mzs([360.934623547669, 360.934523547669], ppm_error=5)
+    assert deduped["peak_id"].is_unique
+
+    # no matches yields an empty DataFrame with the peak columns preserved
+    empty = peaks.match_mzs([1.0], ppm_error=5)
+    assert empty.empty
+    assert list(empty.columns) == [field.name for field in fields(Peak)]
