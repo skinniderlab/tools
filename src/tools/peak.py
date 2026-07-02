@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from tools import Compound, IsotopeDB
-from tools.utils import get_ppm_range
+from tools.utils import SortedValueIndex, get_ppm_range
 
 
 class Peaks:
@@ -29,9 +29,7 @@ class Peaks:
         self._row_by_id = {peak_id: pos for pos, peak_id in enumerate(self._df["peak_id"])}
         # m/z sorted once so match queries can binary-search their window
         # (O(log N) per query) instead of scanning every peak.
-        mz = self._df["mz"].to_numpy()
-        self._mz_sort_order = np.argsort(mz, kind="stable")
-        self._sorted_mz = mz[self._mz_sort_order]
+        self._mz_index = SortedValueIndex(self._df["mz"].to_numpy(), get_ppm_range)
 
     def __len__(self) -> int:
         return len(self._df)
@@ -288,10 +286,7 @@ class Peaks:
         """
         mask = np.zeros(len(self._df), dtype=bool)
         for mz in mzs:
-            lower_bound, upper_bound = get_ppm_range(mz, ppm_error)
-            lo = np.searchsorted(self._sorted_mz, lower_bound, side="left")
-            hi = np.searchsorted(self._sorted_mz, upper_bound, side="right")
-            mask[self._mz_sort_order[lo:hi]] = True
+            mask[self._mz_index.search(mz, ppm_error)] = True
 
         return self._df[mask].copy()
 
