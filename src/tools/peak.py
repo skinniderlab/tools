@@ -3,6 +3,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, fields
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from tools import Compound, IsotopeDB
@@ -26,6 +27,11 @@ class Peaks:
         self.isotope_db = IsotopeDB(isotope_filepath)
         self._df = self._build_dataframe(filepath)
         self._row_by_id = {peak_id: pos for pos, peak_id in enumerate(self._df["peak_id"])}
+        # m/z sorted once so match queries can binary-search their window
+        # (O(log N) per query) instead of scanning every peak.
+        mz = self._df["mz"].to_numpy()
+        self._mz_sort_order = np.argsort(mz, kind="stable")
+        self._sorted_mz = mz[self._mz_sort_order]
 
     def __len__(self) -> int:
         return len(self._df)
@@ -254,10 +260,12 @@ class Peaks:
             The subset of the peak DataFrame (see :meth:`to_df`) whose rows match,
             with the collection's original index preserved. Empty when nothing matches.
         """
-        mask = pd.Series(False, index=self._df.index)
+        mask = np.zeros(len(self._df), dtype=bool)
         for mz in mzs:
             lower_bound, upper_bound = get_ppm_range(mz, ppm_error)
-            mask |= self._df["mz"].between(lower_bound, upper_bound)
+            lo = np.searchsorted(self._sorted_mz, lower_bound, side="left")
+            hi = np.searchsorted(self._sorted_mz, upper_bound, side="right")
+            mask[self._mz_sort_order[lo:hi]] = True
 
         return self._df[mask].copy()
 
