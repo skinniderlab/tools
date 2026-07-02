@@ -39,13 +39,37 @@ class Peaks:
     def __iter__(self) -> Iterator["Peak"]:
         return (self._to_peak(row) for row in self._df.itertuples(index=False))
 
-    def __getitem__(self, item: int | str) -> "Peak":
+    def __getitem__(self, item: str | list[str]) -> "pd.Series | pd.DataFrame":
         """
-        Retrieve a peak by its peak ID.
+        Access peak column(s) by name.
+
+        ``peaks["mz"]`` returns that column as a Series; ``peaks[["mz", "rt"]]``
+        returns a DataFrame of those columns.
 
         Parameters
         ----------
-        item : int or str
+        item : str or list of str
+            Column name, or list of column names, to select.
+
+        Returns
+        -------
+        pd.Series or pd.DataFrame
+            The selected column (Series) or columns (DataFrame).
+
+        Raises
+        ------
+        KeyError
+            If any requested column does not exist.
+        """
+        return self._df[item]
+
+    def get_peak(self, peak_id: int | str) -> "Peak":
+        """
+        Retrieve a single peak by its peak ID.
+
+        Parameters
+        ----------
+        peak_id : int or str
             Peak ID to look up.
 
         Returns
@@ -58,8 +82,10 @@ class Peaks:
         KeyError
             If no peak with the given ID exists in the collection.
         """
-        if (pos := self._row_by_id.get(item)) is None:
-            raise KeyError(f"Peak with peak id {item} is not present in the provided peaks file.")
+        if (pos := self._row_by_id.get(peak_id)) is None:
+            raise KeyError(
+                f"Peak with peak id {peak_id} is not present in the provided peaks file."
+            )
 
         return self._to_peak(next(self._df.iloc[[pos]].itertuples(index=False)))
 

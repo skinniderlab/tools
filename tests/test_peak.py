@@ -1,5 +1,7 @@
 from dataclasses import fields
 
+import pytest
+
 from tools import Compound, Peak
 
 
@@ -31,13 +33,25 @@ def test_peak_instantiation(isotope_db, peaks):
         formula=Compound.from_str("C9H27O6N4P2K", isotope_db),
     )
 
-    assert peaks[28] == peak_1
-    assert peaks[1089] == peak_2
+    assert peaks.get_peak(28) == peak_1
+    assert peaks.get_peak(1089) == peak_2
+
+
+def test_getitem_column(peaks):
+    mz = peaks["mz"]
+    assert len(mz) == len(peaks)
+    assert peaks.get_peak(28).mz in set(mz)
+
+    subset = peaks[["mz", "rt"]]
+    assert list(subset.columns) == ["mz", "rt"]
+
+    with pytest.raises(KeyError):
+        peaks["not_a_column"]
 
 
 def test_peak_2(peaks_2, isotope_db):
     peak = Peak(peak_id="131.0462_11.0590", mz=131.046249, rt=11.059, smiles="C(CNC(=O)N)C(=O)O")
-    assert peaks_2["131.0462_11.0590"] == peak
+    assert peaks_2.get_peak("131.0462_11.0590") == peak
     assert peak in peaks_2
     assert "131.0462_11.0590" in peaks_2
 
@@ -50,15 +64,12 @@ def test_mz(peaks):
 
 
 def test_mzs(peaks):
-    # union of matches across queries, each matching peak returned once
     result = peaks.match_mzs([288.908623547669, 360.934623547669], ppm_error=5)
     assert {1, 3, 4}.issubset(set(result["peak_id"]))
 
-    # a peak matched by two nearby queries appears only once
     deduped = peaks.match_mzs([360.934623547669, 360.934523547669], ppm_error=5)
     assert deduped["peak_id"].is_unique
 
-    # no matches yields an empty DataFrame with the peak columns preserved
     empty = peaks.match_mzs([1.0], ppm_error=5)
     assert empty.empty
     assert list(empty.columns) == [field.name for field in fields(Peak)]
