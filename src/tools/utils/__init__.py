@@ -13,10 +13,11 @@ from .core import (
     remove_noise,
     str_to_dict,
 )
-from .sort_value_index import SortedValueIndex
+from .sort_value_index import SortedValueIndex, symmetric_window
 
 __all__ = [
     "SortedValueIndex",
+    "symmetric_window",
     "aggregate_dict_values",
     "get_adducts",
     "get_charge",
