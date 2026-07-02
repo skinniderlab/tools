@@ -1,11 +1,12 @@
 import logging
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 
 import pandas as pd
 
 from tools import Compound, IsotopeDB
+from tools.utils import get_ppm_range
 
 
 class Peaks:
@@ -23,13 +24,14 @@ class Peaks:
             Path to an isotope database file. If None, the default database is used.
         """
         self.isotope_db = IsotopeDB(isotope_filepath)
-        self.peaks = self._process_peaks(filepath)
+        self._df = self._build_dataframe(filepath)
+        self._row_by_id = {peak_id: pos for pos, peak_id in enumerate(self._df["peak_id"])}
 
     def __len__(self) -> int:
-        return len(self.peaks)
+        return len(self._df)
 
     def __iter__(self) -> Iterator["Peak"]:
-        return iter(self.peaks.values())
+        return (self._to_peak(row) for row in self._df.itertuples(index=False))
 
     def __getitem__(self, item: int | str) -> "Peak":
         """
@@ -50,13 +52,15 @@ class Peaks:
         KeyError
             If no peak with the given ID exists in the collection.
         """
-        if (query_peak := self.peaks.get(item, None)) is None:
+        if (pos := self._row_by_id.get(item)) is None:
             raise KeyError(f"Peak with peak id {item} is not present in the provided peaks file.")
 
-        return query_peak
+        return self._to_peak(next(self._df.iloc[[pos]].itertuples(index=False)))
 
-    def __contains__(self, item: int | str) -> bool:
-        return item in self.peaks or item in self.peaks.values()
+    def __contains__(self, item: object) -> bool:
+        if isinstance(item, Peak):
+            return any(item == peak for peak in self)
+        return item in self._row_by_id
 
     @staticmethod
     def _read_and_validate(filepath: str | Path) -> pd.DataFrame:
@@ -124,9 +128,15 @@ class Peaks:
 
         return df.replace({"Unknown": None, float("nan"): None})
 
-    def _process_peaks(self, filepath: str | Path) -> "dict[int | str, Peak]":
+    def _build_dataframe(self, filepath: str | Path) -> pd.DataFrame:
         """
-        Read, validate, and convert peak rows into Peak objects.
+        Read and validate the peak file into the canonical peak DataFrame.
+
+        The returned frame has exactly one column per Peak field, in field order.
+        Formula strings are canonicalized (invalid ones become None); a ``smiles``
+        column is derived from ``true_SMILES`` when present. This frame is the
+        single source of truth from which Peak objects are built and which
+        :meth:`to_df` returns.
 
         Parameters
         ----------
@@ -135,45 +145,103 @@ class Peaks:
 
         Returns
         -------
-        dict[str or int, Peak]
-            Dictionary mapping peak IDs to their corresponding Peak objects.
+        pd.DataFrame
+            Canonical peak DataFrame with columns matching the Peak fields.
         """
         df = self._read_and_validate(filepath)
 
-        has_smiles = True if "true_SMILES" in df.columns else False
+        df["smiles"] = df["true_SMILES"] if "true_SMILES" in df.columns else None
+        df["formula"] = self._resolve_formulas(df["formula"])
 
-        peak_info = {}
-        for row in df.itertuples():
-            computed_formula = None
-            try:
-                if row.formula is not None:
-                    computed_formula = Compound.from_str(
-                        formula=row.formula, isotope_db=self.isotope_db
-                    )
-            except ValueError:
-                # ignore invalid formulas
-                logging.warning(f"Unable to parse formula: {row.formula}")
+        columns = [field.name for field in fields(Peak)]
+        return df[columns].reset_index(drop=True)
 
-            peak_info[row.peak_id] = Peak(
-                peak_id=row.peak_id,
-                mz=row.mz,
-                rt=row.rt,
-                formula=computed_formula,
-                level=row.level,
-                accession=row.accession,
-                annotation=row.annotation,
-                smiles=row.true_SMILES if has_smiles else None,
-            )
-        return peak_info
+    def _resolve_formulas(self, formulas: pd.Series) -> pd.Series:
+        """
+        Canonicalize a column of formula strings, memoizing repeated values.
 
-@dataclass(frozen=True)
+        Each distinct formula is parsed at most once; unparseable formulas are
+        logged and mapped to None.
+
+        Parameters
+        ----------
+        formulas : pd.Series
+            Raw formula strings (or None) from the peak file.
+
+        Returns
+        -------
+        pd.Series
+            Canonical formula strings, with None where the input was None or unparseable.
+        """
+        cache: dict[str, str | None] = {}
+
+        def resolve(formula: str | None) -> str | None:
+            if formula is None:
+                return None
+            if formula not in cache:
+                try:
+                    cache[formula] = Compound.from_str(
+                        formula=formula, isotope_db=self.isotope_db
+                    ).formula
+                except ValueError:
+                    logging.warning(f"Unable to parse formula: {formula}")
+                    cache[formula] = None
+            return cache[formula]
+
+        # dtype=object keeps None as None (a plain Series would infer a string
+        # dtype and coerce None to NaN).
+        return pd.Series([resolve(f) for f in formulas], index=formulas.index, dtype=object)
+
+    @staticmethod
+    def _to_peak(row: "tuple") -> "Peak":
+        """
+        Build a Peak from a row of the canonical DataFrame.
+
+        Parameters
+        ----------
+        row : namedtuple
+            A row yielded by ``self._df.itertuples(index=False)``; its fields
+            match the Peak fields one-to-one.
+
+        Returns
+        -------
+        Peak
+            The Peak object for that row.
+        """
+        return Peak(**row._asdict())
+
+    def match_mz(self, mz: float, ppm_error: float) -> "list[Peak]":
+        """
+        Match a single m/z value against the peaks in this collection.
+
+        Find every peak whose m/z falls within ``ppm_error`` parts-per-million
+        of the query value.
+
+        Parameters
+        ----------
+        mz : float
+            m/z value to match against the collection's peaks.
+        ppm_error : float
+            Mass tolerance in parts-per-million used to define the match window.
+
+        Returns
+        -------
+        list[Peak]
+            The matching Peak objects, empty when no peak matches.
+        """
+        lower_bound, upper_bound = get_ppm_range(mz, ppm_error)
+        matches = self._df[(self._df["mz"] >= lower_bound) & (self._df["mz"] <= upper_bound)]
+        return [self._to_peak(row) for row in matches.itertuples(index=False)]
+
+
+@dataclass(frozen=True, slots=True)
 class Peak:
     """A single chromatographic peak with optional compound annotation."""
 
     peak_id: int | str
     mz: float
     rt: float
-    formula: Compound | None = None
+    formula: str | None = None
     accession: str | None = None
     level: int | None = None
     annotation: str | None = None

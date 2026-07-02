@@ -1,3 +1,5 @@
+from dataclasses import fields
+
 from tools import Compound, Peak
 
 
@@ -38,3 +40,12 @@ def test_peak_2(peaks_2, isotope_db):
     assert peaks_2["131.0462_11.0590"] == peak
     assert peak in peaks_2
     assert "131.0462_11.0590" in peaks_2
+
+
+def test_mz(peaks):
+    assert [peak.peak_id for peak in peaks.match_mz(288.908623547669, ppm_error=5)] == [1]
+    assert 1 in [
+        peak.peak_id for peak in peaks.match_mz(288.908623547669 * (1 + 3 / 1e6), ppm_error=5)
+    ]
+    assert {3, 4}.issubset({peak.peak_id for peak in peaks.match_mz(360.934623547669, ppm_error=5)})
+    assert peaks.match_mz(1.0, ppm_error=5) == []
