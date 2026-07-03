@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Callable, Tuple
 
 import numpy as np
@@ -67,3 +68,40 @@ class SortedValueIndex:
         lo = np.searchsorted(self._sorted_values, lower_bound, side="left")
         hi = np.searchsorted(self._sorted_values, upper_bound, side="right")
         return np.sort(self._order[lo:hi])
+
+    def search_many(self, values: Iterable[float], tolerance: float) -> np.ndarray:
+        """
+        Return the positions of reference values within ``tolerance`` of *any* query.
+
+        The vectorized counterpart of :meth:`search`: rather than looping over
+        queries in Python, it binary-searches every query's window at once and
+        returns the union of matching positions. Each matching position appears
+        once, even when several queries hit it.
+
+        Parameters
+        ----------
+        values : Iterable[float]
+            Query values.
+        tolerance : float
+            Tolerance defining each (inclusive) window; its meaning is set by
+            ``bounds_func`` (see :meth:`search`).
+
+        Returns
+        -------
+        np.ndarray
+            Integer positions into the original (unsorted) reference array,
+            in ascending order. Empty when no query matches.
+        """
+        values = np.asarray(list(values))
+        if values.size == 0:
+            return np.empty(0, dtype=np.intp)
+
+        lower_bounds, upper_bounds = self._bounds_func(values, tolerance)
+        lo = np.searchsorted(self._sorted_values, lower_bounds, side="left")
+        hi = np.searchsorted(self._sorted_values, upper_bounds, side="right")
+
+        diff = np.zeros(self._sorted_values.size + 1, dtype=np.intp)
+        np.add.at(diff, lo, 1)
+        np.add.at(diff, hi, -1)
+        covered = np.cumsum(diff[:-1]) > 0
+        return np.sort(self._order[covered])

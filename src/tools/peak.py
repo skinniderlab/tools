@@ -3,7 +3,6 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, fields
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from tools import Compound, IsotopeDB
@@ -284,11 +283,8 @@ class Peaks:
             The subset of the peak DataFrame (see :meth:`to_df`) whose rows match,
             with the collection's original index preserved. Empty when nothing matches.
         """
-        mask = np.zeros(len(self._df), dtype=bool)
-        for mz in mzs:
-            mask[self._mz_index.search(mz, ppm_error)] = True
-
-        return self._df[mask].copy()
+        positions = self._mz_index.search_many(mzs, ppm_error)
+        return self._df.iloc[positions].copy()
 
 
 @dataclass(frozen=True, slots=True)

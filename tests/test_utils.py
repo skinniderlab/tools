@@ -3,6 +3,7 @@ import gzip
 import numpy as np
 
 from tools.utils import (
+    SortedValueIndex,
     get_adducts,
     get_charge,
     get_decoy_info,
@@ -241,10 +242,10 @@ def test_get_formula():
     chemical formula string.
     """
     element_counts_and_charges = [
-        ({"Pb": 1, "N": 2, "O": 6}, 2.0),
+        ({"Pb": 1, "N": 2, "O": 6}, 2),
         ({"C": 4, "H": 12, "S": 2, "O": 2}, 0),
         ({"C": 4, "H": 12, "S": 2, "O": 2}, -1),
-        ({"C": 4, "H": 12, "S": 2, "O": 2}, -1.0),
+        ({"C": 4, "H": 12, "S": 2, "O": 2}, -1),
     ]
     expected = ["PbN2O6+2", "C4H12S2O2", "C4H12S2O2-", "C4H12S2O2-"]
     for i, (element_count, charge) in enumerate(element_counts_and_charges):
@@ -270,3 +271,22 @@ def test_get_charge():
     for k, v in formulas_to_charges.items():
         result = get_charge(k)
         assert result == v
+
+
+def test_sorted_value_index_search_many():
+    values = np.array([10, 30, 20, 40, 25])
+    index = SortedValueIndex(values)
+
+    np.testing.assert_array_equal(index.search_many([10, 40], tolerance=1), [0, 3])
+
+    np.testing.assert_array_equal(
+        index.search_many([20, 24, 26], tolerance=2), [2, 4]
+    )
+
+    assert index.search_many([], tolerance=1).size == 0
+
+    queries = [20, 30, 41]
+    expected = np.unique(
+        np.concatenate([index.search(q, tolerance=2) for q in queries])
+    )
+    np.testing.assert_array_equal(index.search_many(queries, tolerance=2), expected)
