@@ -217,3 +217,54 @@ class Spectrum:
             return 0.0
         matches = self._match_peaks(other_spectrum, ppm_error)
         return float(function(matches[:, 1], matches[:, 3]))
+
+    def combine_peaks(self, ppm_error: float) -> np.ndarray:
+        """
+        Merge peaks whose m/z values lie within a ppm tolerance of one another.
+
+        Peaks with a non-positive m/z or intensity are discarded and the
+        remaining peaks are sorted by ascending m/z. Consecutive peaks whose
+        m/z difference is no larger than ``mz * ppm_error * 1e-6`` are collapsed
+        into a single peak. Grouping is transitive: a run of adjacent peaks that
+        each fall within tolerance of their neighbour are all merged together.
+        Each merged peak's m/z and intensity are the means of its members.
+
+        Parameters
+        ----------
+        ppm_error : float
+            Mass tolerance in parts-per-million used to decide whether two
+            adjacent peaks belong to the same group.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of shape ``(n, 2)`` with columns ``[mz, intensity]``, one row
+            per merged peak, sorted by ascending m/z. An empty ``(0, 2)`` array
+            is returned when the spectrum contains no positive peaks.
+        """
+        peak = np.column_stack([self.mz, self.intensity])
+        spectrum = peak[np.all(peak > 0, axis=1)]
+        spectrum = spectrum[np.argsort(spectrum[:, 0])]
+
+        if spectrum.shape[0] == 0:
+            return spectrum.reshape(0, 2)
+
+        mzs = spectrum[:, 0]
+        mz_diffs = np.round(mzs[1:] - mzs[:-1], 9)
+        within_window = mz_diffs <= mzs[:-1] * ppm_error * 1e-6
+
+        grouped_mzs = []
+        grouped_intensities = []
+        group = [0]
+        for i, within in enumerate(within_window):
+            if within:
+                group.append(i + 1)
+            else:
+                grouped_mzs.append(np.mean(mzs[group]))
+                grouped_intensities.append(np.mean(spectrum[group, 1]))
+                group = [i + 1]
+        grouped_mzs.append(np.mean(mzs[group]))
+        grouped_intensities.append(np.mean(spectrum[group, 1]))
+
+        return np.stack([grouped_mzs, grouped_intensities], axis=1)
+

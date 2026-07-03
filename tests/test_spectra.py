@@ -187,3 +187,25 @@ def test_compare_spectra_no_match():
 
     result = spec.compare_spectra(other, ppm_error=10, function=np.dot)
     assert result == pytest.approx(0.0)
+
+
+def test_combine_peaks():
+    spec = _make_spectrum(mz=[100.0, 100.0005, 200.0], intensity=[0.5, 0.6, 0.8])
+    combined = spec.combine_peaks(ppm_error=10)
+    assert np.allclose(combined, [[100.00025, 0.55], [200.0, 0.8]])
+
+    combined = spec.combine_peaks(ppm_error=1)
+    assert np.allclose(combined, [[100.0, 0.5], [100.0005, 0.6], [200.0, 0.8]])
+
+    spec = _make_spectrum(mz=[100.0, 100.0008, 100.0016], intensity=[0.3, 0.6, 0.9])
+    combined = spec.combine_peaks(ppm_error=10)
+    assert np.allclose(combined, [[100.0008, 0.6]])
+
+    spec = _make_spectrum(mz=[100.0, 0.0, 200.0], intensity=[0.5, 0.9, 0.0])
+    combined = spec.combine_peaks(ppm_error=10)
+    assert np.allclose(combined, [[100.0, 0.5]])
+
+    # No positive peaks yields an empty (0, 2) array.
+    spec = _make_spectrum(mz=[], intensity=[])
+    combined = spec.combine_peaks(ppm_error=10)
+    assert combined.shape == (0, 2)
