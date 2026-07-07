@@ -76,39 +76,50 @@ class Spectra:
         """
         return self._df[item]
 
-    def get_by(self, attribute: str, value: object) -> pd.DataFrame:
+    def get_by(self, **conditions: object) -> pd.DataFrame:
         """
-        Return the spectra whose ``attribute`` equals ``value``.
+        Return the spectra matching every ``attribute=value`` condition.
 
-        Backed by a cached hash index built once per attribute on first use, so
-        repeated equality lookups are O(1) average (plus the cost of returning
-        the matched rows) rather than an O(N) scan. Use :meth:`filter` for range
-        queries or any condition more complex than exact equality.
+        Conditions are combined with logical AND: a spectrum is included only if
+        all of its named attributes equal the given values. Each attribute is
+        served by a cached hash index built once on first use, so a lookup is
+        O(1) average (plus the cost of returning the matched rows) rather than an
+        O(N) scan. Use :meth:`filter` for range queries or any condition more
+        complex than exact equality.
 
         Parameters
         ----------
-        attribute : str
-            Name of a scalar :class:`Spectrum` attribute to filter on, e.g.
-            ``"ms_level"``, ``"polarity"``, or ``"file"``.
-        value : object
-            Value the attribute must equal for a spectrum to be included.
+        **conditions : object
+            One or more ``attribute=value`` pairs, where each attribute is a
+            scalar :class:`Spectrum` field, e.g.
+            ``spectra.get_by(ms_level=2, polarity=1)``.
 
         Returns
         -------
         pd.DataFrame
-            The subset of the metadata frame whose rows match, with the
-            collection's original index preserved. Empty when nothing matches.
+            The subset of the metadata frame whose rows match every condition,
+            with the collection's original index preserved. Empty when nothing
+            matches.
 
         Raises
         ------
+        ValueError
+            If no conditions are given.
         AttributeError
-            If ``attribute`` is not a valid :class:`Spectrum` attribute.
+            If any attribute is not a valid :class:`Spectrum` attribute.
         TypeError
-            If ``attribute`` holds unhashable (array-valued) data such as
+            If any attribute holds unhashable (array-valued) data such as
             ``"mz"`` or ``"intensity"``; use :meth:`filter` for those.
         """
-        positions = self._equality_index(attribute).get(value, [])
-        return self._df.iloc[positions].copy()
+        if not conditions:
+            raise ValueError("get_by requires at least one attribute=value condition.")
+
+        matched: set[int] | None = None
+        for attribute, value in conditions.items():
+            positions = set(self._equality_index(attribute).get(value, []))
+            matched = positions if matched is None else matched & positions
+
+        return self._df.iloc[sorted(matched)].copy()
 
     def filter(self, predicate: Callable[["Spectrum"], bool]) -> pd.DataFrame:
         """

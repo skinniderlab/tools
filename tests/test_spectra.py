@@ -62,31 +62,44 @@ def test_spectrum_file_paths(data_dir, spectra):
 
 
 def test_get_by(spectra):
-    ms1 = spectra.get_by("ms_level", 1)
-    ms2 = spectra.get_by("ms_level", 2)
+    ms1 = spectra.get_by(ms_level=1)
+    ms2 = spectra.get_by(ms_level=2)
     assert (ms1["ms_level"] == 1).all()
     assert (ms2["ms_level"] == 2).all()
     assert len(ms1) + len(ms2) == len(spectra)
 
-    blanks = spectra.get_by("file", "Blank1A.mzML")
+    blanks = spectra.get_by(file="Blank1A.mzML")
     assert len(blanks) == 100
     assert (blanks["file"] == "Blank1A.mzML").all()
+
+    # Multiple conditions are AND-combined and agree with the equivalent filter.
+    ms2_pos = spectra.get_by(ms_level=2, polarity=1)
+    assert ((ms2_pos["ms_level"] == 2) & (ms2_pos["polarity"] == 1)).all()
+    assert ms2_pos.index.tolist() == (
+        spectra.filter(lambda sp: sp.ms_level == 2 and sp.polarity == 1).index.tolist()
+    )
 
     # Original row order/index is preserved in the returned frame.
     assert ms1.index.tolist() == sorted(ms1.index.tolist())
 
     # Cached index yields identical results on a repeat call.
-    assert spectra.get_by("ms_level", 1).index.tolist() == ms1.index.tolist()
+    assert spectra.get_by(ms_level=1).index.tolist() == ms1.index.tolist()
 
     # No spectrum matches -> empty frame.
-    assert len(spectra.get_by("ms_level", 99)) == 0
+    assert len(spectra.get_by(ms_level=99)) == 0
+
+    # A condition that no row satisfies empties the whole AND result.
+    assert len(spectra.get_by(ms_level=1, polarity=99)) == 0
+
+    with pytest.raises(ValueError, match="at least one"):
+        spectra.get_by()
 
     with pytest.raises(AttributeError, match="Unknown Spectrum attribute"):
-        spectra.get_by("not_an_attribute", 1)
+        spectra.get_by(not_an_attribute=1)
 
     # Array-valued attributes cannot be equality-indexed.
     with pytest.raises(TypeError, match="not hashable"):
-        spectra.get_by("mz", np.array([1.0]))
+        spectra.get_by(mz=np.array([1.0]))
 
 
 def test_filter(spectra):
@@ -103,7 +116,7 @@ def test_filter(spectra):
 
     # Filter and get_by agree on a plain equality condition.
     assert spectra.filter(lambda sp: sp.ms_level == 1).index.tolist() == (
-        spectra.get_by("ms_level", 1).index.tolist()
+        spectra.get_by(ms_level=1).index.tolist()
     )
 
     # Always-false predicate -> empty frame.
