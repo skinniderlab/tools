@@ -12,7 +12,7 @@ def test_peaks_object(isotope_db, peaks):
         rt=64.8,
     )
 
-    assert peak in peaks, "Peaks object returned inaccurate membership result. "
+    assert peak in peaks, "PeakList object returned inaccurate membership result. "
     assert 1 in peaks, "Peak object returned inaccurate membership result. "
 
 

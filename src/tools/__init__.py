@@ -1,7 +1,7 @@
 from tools.database import Database
 from tools.elements import Compound, Element, Isotope, IsotopeDB
-from tools.peak import Peak, Peaks
+from tools.peak import Peak, PeakList
 from tools.spectra import Spectra
 from tools.utils import SortedValueIndex
 
-__all__ = ["Compound", "Database", "Element", "Isotope", "IsotopeDB", "Peak", "Peaks", "SortedValueIndex", "Spectra"]
+__all__ = ["Compound", "Database", "Element", "Isotope", "IsotopeDB", "Peak", "PeakList", "SortedValueIndex", "Spectra"]

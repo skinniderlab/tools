@@ -9,7 +9,7 @@ from tools import Compound, IsotopeDB
 from tools.utils import SortedValueIndex, get_ppm_range
 
 
-class Peaks:
+class PeakList:
     """A collection of chromatographic peaks parsed from a peak list file."""
 
     def __init__(self, filepath: str | Path, isotope_filepath: str | Path | None = None):
