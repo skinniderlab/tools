@@ -1,10 +1,11 @@
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import pymzml
 from tools.utils import get_ppm_range
 
@@ -41,13 +42,147 @@ class Spectra:
             this unit. Defaults to 'seconds'.
         """
         self.rtime_unit: str = self._configure_retention_time_unit(rtime_unit)
-        self.spectra = self._read_mzml_files(filepaths)
+        self._df = self._read_mzml_files(filepaths)
+        # hash indexes mapping attribute's distinct values to the row positions
+        self._equality_indexes: dict[str, dict[object, list[int]]] = {}
 
     def __len__(self) -> int:
-        return len(self.spectra)
+        return len(self._df)
 
     def __iter__(self) -> Iterator["Spectrum"]:
-        return iter(self.spectra)
+        return (Spectrum(**row._asdict()) for row in self._df.itertuples(index=False))
+
+    def __getitem__(self, item: str | list[str]) -> "pd.Series | pd.DataFrame":
+        """
+        Access spectrum metadata column(s) by name.
+
+        ``spectra["ms_level"]`` returns that column as a Series;
+        ``spectra[["ms_level", "rtime"]]`` returns a DataFrame of those columns.
+
+        Parameters
+        ----------
+        item : str or list of str
+            Column name, or list of column names, to select.
+
+        Returns
+        -------
+        pd.Series or pd.DataFrame
+            The selected column (Series) or columns (DataFrame).
+
+        Raises
+        ------
+        KeyError
+            If any requested column does not exist.
+        """
+        return self._df[item]
+
+    def get_by(self, attribute: str, value: object) -> pd.DataFrame:
+        """
+        Return the spectra whose ``attribute`` equals ``value``.
+
+        Backed by a cached hash index built once per attribute on first use, so
+        repeated equality lookups are O(1) average (plus the cost of returning
+        the matched rows) rather than an O(N) scan. Use :meth:`filter` for range
+        queries or any condition more complex than exact equality.
+
+        Parameters
+        ----------
+        attribute : str
+            Name of a scalar :class:`Spectrum` attribute to filter on, e.g.
+            ``"ms_level"``, ``"polarity"``, or ``"file"``.
+        value : object
+            Value the attribute must equal for a spectrum to be included.
+
+        Returns
+        -------
+        pd.DataFrame
+            The subset of the metadata frame whose rows match, with the
+            collection's original index preserved. Empty when nothing matches.
+
+        Raises
+        ------
+        AttributeError
+            If ``attribute`` is not a valid :class:`Spectrum` attribute.
+        TypeError
+            If ``attribute`` holds unhashable (array-valued) data such as
+            ``"mz"`` or ``"intensity"``; use :meth:`filter` for those.
+        """
+        positions = self._equality_index(attribute).get(value, [])
+        return self._df.iloc[positions].copy()
+
+    def filter(self, predicate: Callable[["Spectrum"], bool]) -> pd.DataFrame:
+        """
+        Return the spectra for which ``predicate`` is truthy.
+
+        The general-purpose companion to :meth:`get_by`: use it for range
+        queries or any condition more complex than exact equality. Each spectrum
+        is materialized and tested, so this is an O(N) scan.
+
+        Parameters
+        ----------
+        predicate : Callable[[Spectrum], bool]
+            Function applied to each :class:`Spectrum`; a spectrum is included
+            when the returned value is truthy. For example::
+
+                spectra.filter(lambda sp: 1.0 <= sp.rtime <= 5.0)
+                spectra.filter(lambda sp: sp.ms_level == 2 and sp.polarity == 1)
+
+        Returns
+        -------
+        pd.DataFrame
+            The subset of the metadata frame whose rows match, with the
+            collection's original index preserved. Empty when nothing matches.
+        """
+        mask = np.array([predicate(spectrum) for spectrum in self], dtype=bool)
+        return self._df[mask].copy()
+
+    def _equality_index(self, attribute: str) -> dict[object, list[int]]:
+        """
+        Return a cached ``value -> row positions`` index for ``attribute``.
+
+        The index is built once on first request and reused thereafter. Building
+        it is a single O(N) pass; subsequent lookups against it are O(1) average.
+
+        Parameters
+        ----------
+        attribute : str
+            Name of a scalar :class:`Spectrum` attribute to index.
+
+        Returns
+        -------
+        dict[object, list[int]]
+            Mapping from each distinct attribute value to the ascending list of
+            row positions holding it.
+
+        Raises
+        ------
+        AttributeError
+            If ``attribute`` is not a valid :class:`Spectrum` attribute.
+        TypeError
+            If the attribute's values are not hashable.
+        """
+        valid_attributes = {f.name for f in fields(Spectrum)}
+        if attribute not in valid_attributes:
+            raise AttributeError(
+                f"Unknown Spectrum attribute {attribute!r}."
+                f" Expected one of: {', '.join(sorted(valid_attributes))}."
+            )
+
+        if attribute not in self._equality_indexes:
+            index: dict[object, list[int]] = {}
+            try:
+                for position, value in enumerate(self._df[attribute].tolist()):
+                    index.setdefault(value, []).append(position)
+            except TypeError as error:
+                raise TypeError(
+                    f"Cannot build an equality index on {attribute!r}: its values"
+                    f" are not hashable. Use filter() for array-valued attributes"
+                    f" such as 'mz' and 'intensity'."
+                ) from error
+            self._equality_indexes[attribute] = index
+
+        return self._equality_indexes[attribute]
+
 
     def _configure_retention_time_unit(self, unit: str) -> str:
         """
@@ -98,9 +233,13 @@ class Spectra:
 
         return self.CONVERSIONS[(unit, self.rtime_unit)](float(rtime))
 
-    def _read_mzml_files(self, filepaths: list[str | Path]) -> "list[Spectrum]":
+    def _read_mzml_files(self, filepaths: list[str | Path]) -> pd.DataFrame:
         """
-        Parse mzML files and return a list of Spectrum objects.
+        Parse mzML files into the canonical spectrum metadata DataFrame.
+
+        The returned frame has exactly one column per :class:`Spectrum` field,
+        in field order, and is the single source of truth from which Spectrum
+        objects are materialized and which :meth:`to_df` returns.
 
         Parameters
         ----------
@@ -109,13 +248,14 @@ class Spectra:
 
         Returns
         -------
-        list[Spectrum]
-            Parsed spectra from all provided files.
+        pd.DataFrame
+            Canonical spectrum metadata frame with columns matching the
+            Spectrum fields.
         """
-        spectra: list[Spectrum] = []
+        records: list[dict] = []
         for file in filepaths:
             run = pymzml.run.Reader(file)
-            for i, spec in enumerate(run):
+            for spec in run:
                 rtime = self._configure_retention_time(spec.scan_time[0], spec.scan_time[1])
 
                 polarity: Literal[0, 1, -1]
@@ -124,20 +264,22 @@ class Spectra:
                 except KeyError:
                     polarity = -1
 
-                spectra.append(
-                    Spectrum(
-                        spectrum_index=spec.index,
-                        ms_level=spec.ms_level,
-                        rtime=rtime,
-                        scan_index=spec.ID,
-                        file=Path(run.path_or_file).name,
-                        mz=spec.mz,
-                        intensity=spec.i,
-                        polarity=polarity,
-                        rtime_unit=self.rtime_unit,
-                    )
+                records.append(
+                    {
+                        "spectrum_index": spec.index,
+                        "ms_level": spec.ms_level,
+                        "rtime": rtime,
+                        "scan_index": spec.ID,
+                        "file": Path(run.path_or_file).name,
+                        "mz": spec.mz,
+                        "intensity": spec.i,
+                        "polarity": polarity,
+                        "rtime_unit": self.rtime_unit,
+                    }
                 )
-        return spectra
+
+        columns = [field.name for field in fields(Spectrum)]
+        return pd.DataFrame(records, columns=columns).reset_index(drop=True)
 
 
 @dataclass()

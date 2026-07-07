@@ -61,6 +61,55 @@ def test_spectrum_file_paths(data_dir, spectra):
     assert {sp.file for sp in spectra} == expected_files
 
 
+def test_get_by(spectra):
+    ms1 = spectra.get_by("ms_level", 1)
+    ms2 = spectra.get_by("ms_level", 2)
+    assert (ms1["ms_level"] == 1).all()
+    assert (ms2["ms_level"] == 2).all()
+    assert len(ms1) + len(ms2) == len(spectra)
+
+    blanks = spectra.get_by("file", "Blank1A.mzML")
+    assert len(blanks) == 100
+    assert (blanks["file"] == "Blank1A.mzML").all()
+
+    # Original row order/index is preserved in the returned frame.
+    assert ms1.index.tolist() == sorted(ms1.index.tolist())
+
+    # Cached index yields identical results on a repeat call.
+    assert spectra.get_by("ms_level", 1).index.tolist() == ms1.index.tolist()
+
+    # No spectrum matches -> empty frame.
+    assert len(spectra.get_by("ms_level", 99)) == 0
+
+    with pytest.raises(AttributeError, match="Unknown Spectrum attribute"):
+        spectra.get_by("not_an_attribute", 1)
+
+    # Array-valued attributes cannot be equality-indexed.
+    with pytest.raises(TypeError, match="not hashable"):
+        spectra.get_by("mz", np.array([1.0]))
+
+
+def test_filter(spectra):
+    # Range query on retention time.
+    rts = sorted(sp.rtime for sp in spectra)
+    lo, hi = rts[len(rts) // 4], rts[3 * len(rts) // 4]
+    in_range = spectra.filter(lambda sp: lo <= sp.rtime <= hi)
+    assert in_range["rtime"].between(lo, hi).all()
+    assert len(in_range) == sum(1 for sp in spectra if lo <= sp.rtime <= hi)
+
+    # Compound condition.
+    ms2_pos = spectra.filter(lambda sp: sp.ms_level == 2 and sp.polarity == 1)
+    assert ((ms2_pos["ms_level"] == 2) & (ms2_pos["polarity"] == 1)).all()
+
+    # Filter and get_by agree on a plain equality condition.
+    assert spectra.filter(lambda sp: sp.ms_level == 1).index.tolist() == (
+        spectra.get_by("ms_level", 1).index.tolist()
+    )
+
+    # Always-false predicate -> empty frame.
+    assert len(spectra.filter(lambda sp: False)) == 0
+
+
 def test_configure_retention_time_same_unit_passthrough():
     s = Spectra(filepaths=[], rtime_unit="minute")
     result = s._configure_retention_time(10.0, "minute")
