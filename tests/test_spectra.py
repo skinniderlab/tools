@@ -61,6 +61,68 @@ def test_spectrum_file_paths(data_dir, spectra):
     assert {sp.file for sp in spectra} == expected_files
 
 
+def test_get_by(spectra):
+    ms1 = spectra.get_by(ms_level=1)
+    ms2 = spectra.get_by(ms_level=2)
+    assert (ms1["ms_level"] == 1).all()
+    assert (ms2["ms_level"] == 2).all()
+    assert len(ms1) + len(ms2) == len(spectra)
+
+    blanks = spectra.get_by(file="Blank1A.mzML")
+    assert len(blanks) == 100
+    assert (blanks["file"] == "Blank1A.mzML").all()
+
+    # Multiple conditions are AND-combined and agree with the equivalent filter.
+    ms2_pos = spectra.get_by(ms_level=2, polarity=1)
+    assert ((ms2_pos["ms_level"] == 2) & (ms2_pos["polarity"] == 1)).all()
+    assert ms2_pos.index.tolist() == (
+        spectra.filter(lambda sp: sp.ms_level == 2 and sp.polarity == 1).index.tolist()
+    )
+
+    # Original row order/index is preserved in the returned frame.
+    assert ms1.index.tolist() == sorted(ms1.index.tolist())
+
+    # Cached index yields identical results on a repeat call.
+    assert spectra.get_by(ms_level=1).index.tolist() == ms1.index.tolist()
+
+    # No spectrum matches -> empty frame.
+    assert len(spectra.get_by(ms_level=99)) == 0
+
+    # A condition that no row satisfies empties the whole AND result.
+    assert len(spectra.get_by(ms_level=1, polarity=99)) == 0
+
+    with pytest.raises(ValueError, match="at least one"):
+        spectra.get_by()
+
+    with pytest.raises(AttributeError, match="Unknown Spectrum attribute"):
+        spectra.get_by(not_an_attribute=1)
+
+    # Array-valued attributes cannot be equality-indexed.
+    with pytest.raises(TypeError, match="not hashable"):
+        spectra.get_by(mz=np.array([1.0]))
+
+
+def test_filter(spectra):
+    # Range query on retention time.
+    rts = sorted(sp.rtime for sp in spectra)
+    lo, hi = rts[len(rts) // 4], rts[3 * len(rts) // 4]
+    in_range = spectra.filter(lambda sp: lo <= sp.rtime <= hi)
+    assert in_range["rtime"].between(lo, hi).all()
+    assert len(in_range) == sum(1 for sp in spectra if lo <= sp.rtime <= hi)
+
+    # Compound condition.
+    ms2_pos = spectra.filter(lambda sp: sp.ms_level == 2 and sp.polarity == 1)
+    assert ((ms2_pos["ms_level"] == 2) & (ms2_pos["polarity"] == 1)).all()
+
+    # Filter and get_by agree on a plain equality condition.
+    assert spectra.filter(lambda sp: sp.ms_level == 1).index.tolist() == (
+        spectra.get_by(ms_level=1).index.tolist()
+    )
+
+    # Always-false predicate -> empty frame.
+    assert len(spectra.filter(lambda sp: False)) == 0
+
+
 def test_configure_retention_time_same_unit_passthrough():
     s = Spectra(filepaths=[], rtime_unit="minute")
     result = s._configure_retention_time(10.0, "minute")
@@ -187,3 +249,25 @@ def test_compare_spectra_no_match():
 
     result = spec.compare_spectra(other, ppm_error=10, function=np.dot)
     assert result == pytest.approx(0.0)
+
+
+def test_combine_peaks():
+    spec = _make_spectrum(mz=[100.0, 100.0005, 200.0], intensity=[0.5, 0.6, 0.8])
+    combined = spec.combine_peaks(ppm_error=10)
+    assert np.allclose(combined, [[100.00025, 0.55], [200.0, 0.8]])
+
+    combined = spec.combine_peaks(ppm_error=1)
+    assert np.allclose(combined, [[100.0, 0.5], [100.0005, 0.6], [200.0, 0.8]])
+
+    spec = _make_spectrum(mz=[100.0, 100.0008, 100.0016], intensity=[0.3, 0.6, 0.9])
+    combined = spec.combine_peaks(ppm_error=10)
+    assert np.allclose(combined, [[100.0008, 0.6]])
+
+    spec = _make_spectrum(mz=[100.0, 0.0, 200.0], intensity=[0.5, 0.9, 0.0])
+    combined = spec.combine_peaks(ppm_error=10)
+    assert np.allclose(combined, [[100.0, 0.5]])
+
+    # No positive peaks yields an empty (0, 2) array.
+    spec = _make_spectrum(mz=[], intensity=[])
+    combined = spec.combine_peaks(ppm_error=10)
+    assert combined.shape == (0, 2)
