@@ -316,7 +316,7 @@ def test_sorted_value_index_search_many_pairs():
 
     # The unique references across all pairs equal the search_many union.
     queries = [20, 24, 26]
-    ref_pos = index.search_many_pairs(queries, tolerance=2)
+    _, ref_pos = index.search_many_pairs(queries, tolerance=2)
     np.testing.assert_array_equal(
         np.unique(ref_pos), index.search_many(queries, tolerance=2)
     )
