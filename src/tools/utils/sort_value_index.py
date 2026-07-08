@@ -105,3 +105,60 @@ class SortedValueIndex:
         np.add.at(diff, hi, -1)
         covered = np.cumsum(diff[:-1]) > 0
         return np.sort(self._order[covered])
+
+    def search_many_pairs(
+        self, values: Iterable[float], tolerance: float
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Return, for every query, the positions of reference values within ``tolerance``.
+
+        The pairwise counterpart of :meth:`search_many`: rather than collapsing
+        overlapping windows into a single union, it keeps the query-to-match
+        relationship, emitting one ``(query, position)`` pair per match. A query
+        that matches several references yields several pairs, and a reference hit
+        by several queries appears in several pairs.
+
+        Like :meth:`search_many`, every query's window is binary-searched at once;
+        the per-query slices are then expanded with vectorized index arithmetic
+        rather than a Python loop.
+
+        Parameters
+        ----------
+        values : Iterable[float]
+            Query values.
+        tolerance : float
+            Tolerance defining each (inclusive) window; its meaning is set by
+            ``bounds_func`` (see :meth:`search`).
+
+        Returns
+        -------
+        query_positions : np.ndarray
+            Integer positions into ``values`` (the queries), one per match.
+        reference_positions : np.ndarray
+            Integer positions into the original (unsorted) reference array, one
+            per match. Pairs are ordered by query, then by ascending reference
+            position within each query. Both arrays are empty when nothing matches.
+        """
+        values = np.asarray(list(values), dtype=float)
+        empty = np.empty(0, dtype=np.intp)
+        if values.size == 0:
+            return empty, empty
+
+        lower_bounds, upper_bounds = self._bounds_func(values, tolerance)
+        lo = np.searchsorted(self._sorted_values, lower_bounds, side="left")
+        hi = np.searchsorted(self._sorted_values, upper_bounds, side="right")
+
+        counts = hi - lo
+        total = int(counts.sum())
+        if total == 0:
+            return empty, empty
+
+        group_starts = np.cumsum(counts) - counts
+        within_query = np.arange(total) - np.repeat(group_starts, counts)
+        sorted_idx = np.repeat(lo, counts) + within_query
+
+        query_positions = np.repeat(np.arange(values.size), counts)
+        reference_positions = self._order[sorted_idx]
+
+        ordering = np.lexsort((reference_positions, query_positions))
+        return query_positions[ordering], reference_positions[ordering]

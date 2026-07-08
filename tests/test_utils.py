@@ -290,3 +290,33 @@ def test_sorted_value_index_search_many():
         np.concatenate([index.search(q, tolerance=2) for q in queries])
     )
     np.testing.assert_array_equal(index.search_many(queries, tolerance=2), expected)
+
+
+def test_sorted_value_index_search_many_pairs():
+    values = np.array([10, 30, 20, 40, 25])
+    index = SortedValueIndex(values)
+
+    query_pos, ref_pos = index.search_many_pairs([10, 40], tolerance=1)
+    np.testing.assert_array_equal(query_pos, [0, 1])
+    np.testing.assert_array_equal(ref_pos, [0, 3])
+
+    query_pos, ref_pos = index.search_many_pairs([20, 24, 26], tolerance=2)
+    np.testing.assert_array_equal(query_pos, [0, 1, 2])
+    np.testing.assert_array_equal(ref_pos, [2, 4, 4])
+
+    query_pos, ref_pos = index.search_many_pairs([25], tolerance=6)
+    np.testing.assert_array_equal(query_pos, [0, 0, 0])
+    np.testing.assert_array_equal(ref_pos, [1, 2, 4])
+
+
+    for empty in (index.search_many_pairs([], tolerance=1),
+                  index.search_many_pairs([100], tolerance=1)):
+        query_pos, ref_pos = empty
+        assert query_pos.size == 0 and ref_pos.size == 0
+
+    # The unique references across all pairs equal the search_many union.
+    queries = [20, 24, 26]
+    ref_pos = index.search_many_pairs(queries, tolerance=2)
+    np.testing.assert_array_equal(
+        np.unique(ref_pos), index.search_many(queries, tolerance=2)
+    )
